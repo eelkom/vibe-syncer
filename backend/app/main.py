@@ -235,7 +235,7 @@ def get_room_host(room_code: str, db: Session = Depends(database.get_db)):
         room_name=db_room.name
     )
 
-@app.get("/rooms/{room_code}", response_model=schemas.RoomDetailResponse)
+@app.get("/rooms/{room_code}", response_model=schemas.RoomDetailsResponse)
 def get_room_details(room_code: str, db: Session = Depends(database.get_db)):
     """
     Get full room details including host info and list of participants.
