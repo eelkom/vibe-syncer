@@ -1,33 +1,30 @@
-import { useState, useRef } from 'react';
-import ReactPlayer from 'react-player';
 import { Play, Pause, Loader2 } from 'lucide-react';
+import { useMusicPlayer } from '@/contexts/hooks/ useMusicPlayer';
 
-interface MusicPlayerProps {
-  url: string;
-}
-
-export default function MusicPlayer({ url }: MusicPlayerProps) {
-  const [playing, setPlaying] = useState(false);
-  const [played, setPlayed] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isReady, setIsReady] = useState(false);
-
-  const playerRef = useRef<ReactPlayer>(null);
+const MusicPlayer = () => {
+  const {
+    isPlaying,
+    play,
+    pause,
+    duration,
+    played,
+    seekTo,
+    isReady,
+    currentUrl,
+  } = useMusicPlayer();
 
   const handlePlayPause = () => {
-    setPlaying(!playing);
+    if (isPlaying) {
+      pause();
+    } else {
+      play();
+    }
   };
 
   const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPlayed = parseFloat(e.target.value);
-    setPlayed(newPlayed);
-    playerRef.current?.seekTo(newPlayed, 'fraction');
+    const amount = parseFloat(e.target.value);
+    seekTo(amount);
   };
-
-  // const handleProgress = (state: { played: number; loaded: number }) => {
-  //   if (!playing) return;
-  //   setPlayed(state.played);
-  // };
 
   const formatTime = (seconds: number) => {
     if (!seconds) return '00:00';
@@ -39,29 +36,20 @@ export default function MusicPlayer({ url }: MusicPlayerProps) {
   const currentTime = duration * played;
 
   return (
-    <div className="border-white-800 bg-white-900 w-full rounded-2xl border p-6 shadow-xl">
-      {/* <div className="hidden">
-        <ReactPlayer
-          ref={playerRef}
-          url={url}
-          playing={playing}
-          volume={0.8}
-          controls={false} 
-          onReady={() => setIsReady(true)}
-          onDurationChange={setDuration}
-          onProgress={handleProgress} 
-          onEnded={() => setPlaying(false)}
-        />
-      </div> */}
-
+    <div className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl">
       <div className="flex flex-col gap-4">
         <div className="text-center">
           <h3 className="text-lg font-bold text-white">Now Playing</h3>
-          <p className="text-sm text-zinc-400">Streaming from URL</p>
+
+          <p className="truncate px-4 text-sm text-zinc-400">
+            {currentUrl
+              ? `Streaming from ${new URL(currentUrl).hostname}`
+              : 'No URL'}
+          </p>
         </div>
 
         <div className="flex items-center gap-3 text-xs text-zinc-400">
-          <span>{formatTime(currentTime)}</span>
+          <span className="w-10 text-right">{formatTime(currentTime)}</span>
           <input
             type="range"
             min={0}
@@ -69,9 +57,10 @@ export default function MusicPlayer({ url }: MusicPlayerProps) {
             step="any"
             value={played}
             onChange={handleSeekChange}
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-zinc-700 accent-indigo-500"
+            disabled={!isReady}
+            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-zinc-700 accent-indigo-500 disabled:opacity-50"
           />
-          <span>{formatTime(duration)}</span>
+          <span className="w-10">{formatTime(duration)}</span>
         </div>
 
         <div className="flex items-center justify-center gap-6">
@@ -82,7 +71,7 @@ export default function MusicPlayer({ url }: MusicPlayerProps) {
           >
             {!isReady ? (
               <Loader2 className="animate-spin" />
-            ) : playing ? (
+            ) : isPlaying ? (
               <Pause fill="currentColor" />
             ) : (
               <Play fill="currentColor" className="ml-1" />
@@ -92,4 +81,6 @@ export default function MusicPlayer({ url }: MusicPlayerProps) {
       </div>
     </div>
   );
-}
+};
+
+export default MusicPlayer;

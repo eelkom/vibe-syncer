@@ -1,28 +1,28 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
-import { Copy, Check, X } from 'lucide-react'; // 아이콘 사용 (없으면 텍스트로 대체 가능)
+import { Copy, Check, X } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 interface InviteRoomModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  roomId: string;
+  roomCode: string;
 }
 
 const InviteFriendModal = ({
   open,
   onOpenChange,
-  roomId,
+  roomCode,
 }: InviteRoomModalProps) => {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopyRoomCode = async () => {
     try {
-      await navigator.clipboard.writeText(roomId);
+      await navigator.clipboard.writeText(roomCode);
       setIsCopied(true);
-
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      logger.error('Failed to copy text: ', err);
     }
   };
 
@@ -50,7 +50,7 @@ const InviteFriendModal = ({
             <div className="flex gap-3">
               <input
                 type="text"
-                value={roomId}
+                value={roomCode}
                 readOnly
                 className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-5 py-3 font-mono text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
               />

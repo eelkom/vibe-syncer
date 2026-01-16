@@ -1,4 +1,6 @@
 import Button from '@/components/ui/Button';
+import Loading from '@/components/ui/Loading';
+import useJoinRoom from '@/hooks/mutations/useJoinRoom';
 import { ROUTE_PATH } from '@/routes/routePath';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
@@ -14,14 +16,20 @@ const JoinRoomModal = ({ open, onOpenChange }: JoinRoomModalProps) => {
   const [roomCode, setRoomCode] = useState('');
   const [nickName, setNickName] = useState('');
 
+  const { mutate: joinRoom, isPending, isError } = useJoinRoom();
+
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomCode.trim()) {
-      alert('enter a room code!');
-      return;
-    }
-    navigate(generatePath(ROUTE_PATH.MUSIC_ROOM, { id: roomCode }));
-    onOpenChange(false);
+    if (!roomCode.trim()) return;
+    joinRoom(
+      { roomCode, nickName },
+      {
+        onSuccess: (roomCode) => {
+          navigate(generatePath(ROUTE_PATH.MUSIC_ROOM, { id: roomCode }));
+          onOpenChange(false);
+        },
+      },
+    );
   };
 
   return (
@@ -38,7 +46,12 @@ const JoinRoomModal = ({ open, onOpenChange }: JoinRoomModalProps) => {
             Enter the room code to join an existing music room.
           </Dialog.Description>
 
-          <form onSubmit={handleJoinRoom}>
+          <form onSubmit={handleJoinRoom} className="relative">
+            {isError && (
+              <div className="mb-4 text-sm text-red-600">
+                Failed to join room. Please check the code and try again.
+              </div>
+            )}
             <div className="mb-6">
               <label
                 htmlFor="roomCode"
@@ -54,6 +67,7 @@ const JoinRoomModal = ({ open, onOpenChange }: JoinRoomModalProps) => {
                 placeholder="Enter room code..."
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
+                disabled={isPending}
               />
             </div>
 
@@ -72,6 +86,7 @@ const JoinRoomModal = ({ open, onOpenChange }: JoinRoomModalProps) => {
                 placeholder="Enter nickname..."
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
+                disabled={isPending}
               />
             </div>
 
@@ -81,13 +96,14 @@ const JoinRoomModal = ({ open, onOpenChange }: JoinRoomModalProps) => {
                   variant="secondary"
                   type="button"
                   onClick={() => setRoomCode('')}
+                  disabled={isPending}
                 >
                   Cancel
                 </Button>
               </Dialog.Close>
 
-              <Button variant="primary" type="submit">
-                Join Room
+              <Button variant="primary" type="submit" disabled={isPending}>
+                {isPending ? <Loading /> : 'Join Room'}
               </Button>
             </div>
           </form>

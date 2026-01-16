@@ -3,6 +3,7 @@ import { Plus, LogIn } from 'lucide-react';
 import CreateRoomModal from './components/CreateRoomModal';
 import JoinRoomModal from './components/JoinRoomModal';
 import Button from '@/components/ui/Button';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const Landing = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -11,11 +12,8 @@ const Landing = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="w-full max-w-4xl">
-        {/* Title */}
         <div className="mb-12 text-center">
-          <div className="mb-6 flex items-center justify-center">
-            {/* TODO: add logo or icon */}
-          </div>
+          <div className="mb-6 flex items-center justify-center"></div>
           <h1 className="mb-4 text-5xl text-gray-900">VibeSyncer</h1>
           <p className="text-xl text-gray-600">
             Music, Chat, and Vibes in Sync
@@ -23,7 +21,6 @@ const Landing = () => {
         </div>
 
         <div className="mb-8 grid gap-6 md:grid-cols-2">
-          {/* Create Room Card */}
           <div className="rounded-2xl bg-white p-8 shadow-lg transition-shadow hover:shadow-xl">
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100">
               <Plus className="h-6 w-6 text-indigo-600" />
@@ -37,7 +34,6 @@ const Landing = () => {
             </Button>
           </div>
 
-          {/* Join Room Card */}
           <div className="rounded-2xl bg-white p-8 shadow-lg transition-shadow hover:shadow-xl">
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
               <LogIn className="h-6 w-6 text-green-600" />
@@ -52,12 +48,15 @@ const Landing = () => {
           </div>
         </div>
 
-        <CreateRoomModal
-          open={showCreateModal}
-          onOpenChange={setShowCreateModal}
-        />
-
-        <JoinRoomModal open={showJoinModal} onOpenChange={setShowJoinModal} />
+        <ErrorBoundary>
+          <CreateRoomModal
+            open={showCreateModal}
+            onOpenChange={setShowCreateModal}
+          />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <JoinRoomModal open={showJoinModal} onOpenChange={setShowJoinModal} />
+        </ErrorBoundary>
       </div>
     </div>
   );
