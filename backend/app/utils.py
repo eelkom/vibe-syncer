@@ -8,17 +8,22 @@ import yt_dlp
 import string
 import random
 import os
+from urllib.parse import urlparse, parse_qs
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.models import models
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
 
+load_dotenv()
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-executor = ThreadPoolExecutor(max_workers=3)
-
+executor = ThreadPoolExecutor(max_workers=4)
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 def get_cookie_path():
     local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cookies.txt')
@@ -132,21 +137,105 @@ def fetch_spotify_metadata(url: str):
         return None
 
 
+def extract_youtube_id(url: str):
+    """
+    Extracts the video ID from various YouTube URL formats.
+    Supports: youtube.com/watch?v=ID, youtu.be/ID, shorts/ID
+    """
+    # 1. Short URL (youtu.be/ID)
+    if "youtu.be" in url:
+        path = urlparse(url).path
+        return path[1:] if path else None
+
+    # 2. Standard URL (youtube.com/watch?v=ID)
+    if "youtube.com" in url:
+        query = urlparse(url).query
+        params = parse_qs(query)
+        return params.get("v", [None])[0]
+
+    return None
+
 # ---------------------------------------------------------
 # 4. Existing Utility: General Metadata Extractor
+# ---------------------------------------------------------
+# ---------------------------------------------------------
+# [Modified] 4. General Metadata Extractor
 # ---------------------------------------------------------
 def extract_video_metadata(url: str):
     logger.info(f"🚀 Starting Metadata Extraction for: {url}")
 
-    # STRATEGY 1: Use Custom Scraper for Spotify
+    # STRATEGY 1: Spotify (Custom Scraper)
     if "spotify" in url.lower():
         return fetch_spotify_metadata(url)
 
-    cookie_path = get_cookie_path()
-    if not cookie_path:
-        logger.warning("⚠️ cookies.txt not found! YouTube request might fail.")
+    # STRATEGY 2: YouTube (Google Data API) - [NEW]
+    if "youtube.com" in url.lower() or "youtu.be" in url.lower():
+        return fetch_youtube_metadata_api(url)
 
-    # STRATEGY 2: Use yt-dlp for YouTube & SoundCloud
+    # STRATEGY 3: SoundCloud & Others (yt-dlp Fallback)
+    return fetch_metadata_with_ytdlp(url)
+
+
+def fetch_youtube_metadata_api(url: str):
+    """
+    Fetch YouTube metadata using Google Data API v3.
+    """
+    if not GOOGLE_API_KEY:
+        logger.error("🚫 GOOGLE_API_KEY is missing! Cannot fetch metadata.")
+        return None
+
+    video_id = extract_youtube_id(url)
+    if not video_id:
+        logger.warning(f"⚠️ Could not extract Video ID from: {url}")
+        return None
+
+    try:
+        youtube = build('youtube', 'v3', developerKey=GOOGLE_API_KEY)
+
+        # API Call: Get video details
+        response = youtube.videos().list(
+            part="snippet,contentDetails",
+            id=video_id
+        ).execute()
+
+        items = response.get("items", [])
+        if not items:
+            logger.warning("⚠️ API returned no details for this video.")
+            return None
+
+        snippet = items[0]["snippet"]
+
+        title = snippet.get("title", "Unknown Title")
+        artist = snippet.get("channelTitle", "Unknown Artist")
+
+        thumbnails = snippet.get("thumbnails", {})
+        thumbnail_url = (
+                thumbnails.get("maxres", {}).get("url") or
+                thumbnails.get("high", {}).get("url") or
+                thumbnails.get("default", {}).get("url")
+        )
+
+        logger.info(f"🎉 [Google API] Success! Title: {title}")
+
+        return {
+            "title": title,
+            "artist": artist,
+            "thumbnail_url": thumbnail_url
+        }
+
+    except Exception as e:
+        logger.error(f"💥 [Google API Error] {e}")
+        return None
+
+
+def fetch_metadata_with_ytdlp(url: str):
+    """
+    Legacy yt-dlp method for non-YouTube platforms (e.g. SoundCloud).
+    """
+    logger.info(f"ℹ️ Attempting yt-dlp for non-YouTube URL: {url}")
+
+    cookie_path = get_cookie_path()
+
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
@@ -154,50 +243,24 @@ def extract_video_metadata(url: str):
         'ignoreerrors': True,
         'no_playlist': True,
         'nocheckcertificate': True,
-        'source_address': '0.0.0.0',
-        # [NOTE] cookies.txt Security & Deployment
-        # This file is not included in Git (.gitignore) for security reasons.
-        # Infused through 'Secret Files' on the Render dashboard.
         'cookiefile': cookie_path,
-        'http_headers': { 
+        'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us,en;q=0.5',
         },
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-
-            if not info:
-                logger.info(f"❌ [DEBUG] Extraction Failed: Info is empty")
-                return None
-
-            if 'entries' in info:
-                entries = list(info['entries'])
-                info = entries[0] if entries else None
-                if not info: return None
-
-            title = info.get('title', 'Unknown Title')
-            artist = info.get('artist') or info.get('uploader') or info.get('creator') or info.get(
-                'channel') or 'Unknown Artist'
-
-            thumbnail_url = info.get('thumbnail')
-            thumbnails = info.get('thumbnails', [])
-            if thumbnails:
-                thumbnail_url = thumbnails[-1].get('url')
-
-            logger.info(f"🎉 [yt-dlp] Success! Title: {title} / Artist: {artist}")
+            if not info: return None
 
             return {
-                "title": title,
-                "artist": artist,
-                "thumbnail_url": thumbnail_url
+                "title": info.get('title', 'Unknown Title'),
+                "artist": info.get('uploader') or info.get('artist') or 'Unknown Artist',
+                "thumbnail_url": info.get('thumbnail')
             }
-
     except Exception as e:
-        logger.error(f"💥 Critical Error during extraction: {e}")
+        logger.error(f"💥 [yt-dlp Error] {e}")
         return None
 
 
@@ -209,47 +272,44 @@ def search_youtube_video(query: str):
     Search YouTube via yt-dlp and return the URL of the first result.
     """
 
-    logger.info(f"🔍 [Backend Search] Searching YouTube for: {query}")
+    logger.info(f"🔍 [API Search] Searching YouTube for: {query}")
 
-    cookie_path = get_cookie_path()
-    if not cookie_path:
-        logger.warning("⚠️ cookies.txt not found! YouTube request might fail.")
-
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'default_search': 'ytsearch1',
-        'noplaylist': True,
-        'nocheckcertificate': True,
-        'source_address': '0.0.0.0',
-        'cookiefile': cookie_path,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us,en;q=0.5',
-        },
-    }
+    if not GOOGLE_API_KEY:
+        logger.error("🚫 GOOGLE_API_KEY is missing! Cannot search.")
+        return None
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(query, download=False)
+        # 1. Build the service
+        youtube = build('youtube', 'v3', developerKey=GOOGLE_API_KEY)
 
-            if 'entries' in info and info['entries']:
-                video_url = info['entries'][0].get('webpage_url')
-                logger.info(f"✅ [Backend Search] Found URL: {video_url}")
-                return video_url
-            elif 'webpage_url' in info:
-                video_url = info['webpage_url']
-                logger.info(f"✅ [Backend Search] Found URL: {video_url}")
-                return video_url
-            else:
-                logger.info(f"⚠️ [Backend Search] No results found for: {query}")
+        # 2. Call the search.list method
+        search_response = youtube.search().list(
+            q=query,
+            part='id,snippet',
+            maxResults=1,
+            type='video'
+        ).execute()
 
+        # 3. Extract Video ID
+        items = search_response.get('items', [])
+        if not items:
+            logger.warning(f"⚠️ [API Search] No results found for: {query}")
+            return None
+
+        video_id = items[0]['id']['videoId']
+        video_title = items[0]['snippet']['title']
+
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        logger.info(f"✅ [API Search] Found: {video_title} ({video_url})")
+
+        return video_url
+
+    except HttpError as e:
+        logger.error(f"💥 [API Error] Google API failed: {e}")
+        return None
     except Exception as e:
-        logger.error(f"💥 [Backend Search Error] {e}")
-
-    return None
-
+        logger.error(f"💥 [Search Error] {e}")
+        return None
 
 # ---------------------------------------------------------
 # 6. New Utility: Process Music Addition (Moved from main.py)
@@ -305,3 +365,8 @@ async def process_music_addition(
     db.refresh(db_item)
 
     return db_item
+
+def shutdown_executor():
+    logger.info("Shutting down ThreadPoolExecutor...")
+    executor.shutdown(wait=True)
+    logger.info("ThreadPoolExecutor shutdown complete.")

@@ -9,9 +9,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from google import genai
 from google.genai import types
-
-# Import the search function created in utils
-from app.utils import search_youtube_video
+from app.utils import search_youtube_video, executor
 
 # [Fix] Configure Logger
 logger = logging.getLogger(__name__)
@@ -24,16 +22,82 @@ client = None
 if api_key:
     client = genai.Client(api_key=api_key)
 
-# [Fix] Create a ThreadPoolExecutor to handle blocking I/O (yt-dlp)
-# This prevents the main WebSocket loop from freezing while searching YouTube.
-executor = ThreadPoolExecutor(max_workers=4)
+# ==========================================
+# [Task] Regex Patterns for Sanitization
+# ==========================================
+# Match raw URLs (http/https) but we will handle [[SONG:]] separately
 
+BOLD_PATTERN = re.compile(r'\*\*(.*?)\*\*')
+CODE_BLOCK_PATTERN = re.compile(r'```[\s\S]*?```')
+SONG_TAG_PATTERN = re.compile(r'\[\[SONG:.*?\]\]')
+URL_PATTERN = re.compile(r'https?://\S+')
+
+def sanitize_user_input(message: str) -> str:
+    """
+        Clean user input before sending to AI.
+        - Limit length to 500 chars
+        - Remove potential prompt injection patterns
+        - Strip dangerous characters
+        - Return empty string if input is whitespace only
+    """
+    if not message:
+        return ""
+
+    clean_message = message.strip()
+    if not clean_message:
+        return ""
+
+    clean_message = clean_message[:500]
+    injection_patterns = [
+        r'\[INSTRUCTION[S]?\]',
+        r'\[SYSTEM\]',
+        r'\[ROLE\]',
+        r'\[CONTEXT\]',
+        r'\[USER\]',
+        r'ignore\s+(previous|above)\s+instructions?',
+        r'disregard\s+(previous|above)',
+    ]
+    for pattern in injection_patterns:
+        clean_message = re.sub(pattern, ' ', clean_message, flags=re.IGNORECASE)
+
+    return clean_message.strip()
+
+def sanitize_ai_response(response: str) -> str:
+    """
+        Clean AI response before broadcasting to room.
+        - Remove unwanted URLs (hallucinated by AI)
+        - Limit response length to 1000 chars
+        - Remove markdown formatting and code blocks
+        - PRESERVE [[SONG: ...]] tags
+    """
+    if not response:
+        return ""
+
+    song_tags = SONG_TAG_PATTERN.findall(response)
+    for i, tag in enumerate(song_tags):
+        response = response.replace(tag, f"__SONG_PLACEHOLDER_{i}__")
+
+    response = CODE_BLOCK_PATTERN.sub('', response)
+    response = URL_PATTERN.sub('', response)
+    response = BOLD_PATTERN.sub(r'\1', response)
+
+    for i, tag in enumerate(song_tags):
+        response = response.replace(f"__SONG_PLACEHOLDER_{i}__", tag)
+
+    if len(response) > 1000:
+        response = response[:997] + "..."
+
+    return response.strip()
 
 async def get_ai_dj_response(user_message: str, user_name: str, chat_history: list = [], current_queue: list = []) -> str:
     """
     Generate response using AI for content + yt-dlp for reliable linking.
     The AI generates a [[SONG: ...]] tag, and the backend replaces it with a real link.
     """
+    clean_message = sanitize_user_input(user_message)
+    if not clean_message:
+        return "🤖 I didn't catch that. Could you try again?"
+
     if not client:
         logger.error("❌ GEMINI_API_KEY is missing.")
         return "🤖 DJ Unavailable (API Key Missing)"
@@ -118,6 +182,8 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
 
         ai_text = response.text.strip()
 
+        ai_text = sanitize_ai_response(ai_text)
+
         # 2. [Backend Logic] Find tags ([[SONG: ...]]) and replace with real links
         matches = re.findall(r"\[\[SONG: (.*?)\]\]", ai_text)
 
@@ -143,8 +209,3 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
         # exc_info=True includes the full stack trace in the logs
         logger.error(f"AI DJ Error: {e}", exc_info=True)
         return "🤖 Sorry, I'm having trouble right now. Please try again later."
-
-def shutdown_ai_executor():
-    logger.info("Stopping AI ThreadPoolExecutor...")
-    executor.shutdown(wait=True)
-    logger.info("AI ThreadPoolExecutor shutdown complete.")

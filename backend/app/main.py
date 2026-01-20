@@ -10,7 +10,7 @@ from app.models import models
 
 # Import Routers
 from app.api.routes import rooms, websockets
-from app.ai import shutdown_ai_executor
+from app.utils import shutdown_executor
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -67,7 +67,7 @@ def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    shutdown_ai_executor()
+    shutdown_executor()
 
 # ---------------------------------------------------------
 # Register Routers
