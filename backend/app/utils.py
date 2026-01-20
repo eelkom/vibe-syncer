@@ -7,14 +7,29 @@ import ssl
 import yt_dlp
 import string
 import random
+import os
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.models import models
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+executor = ThreadPoolExecutor(max_workers=3)
 
+
+def get_cookie_path():
+    local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cookies.txt')
+    render_path = "/etc/secrets/cookies.txt"
+
+    if os.path.exists(local_path):
+        return local_path
+    elif os.path.exists(render_path):
+        return render_path
+    else:
+        return None
 
 # ---------------------------------------------------------
 # 1. New Utility: Room Code Generator
@@ -127,6 +142,10 @@ def extract_video_metadata(url: str):
     if "spotify" in url.lower():
         return fetch_spotify_metadata(url)
 
+    cookie_path = get_cookie_path()
+    if not cookie_path:
+        logger.warning("⚠️ cookies.txt not found! YouTube request might fail.")
+
     # STRATEGY 2: Use yt-dlp for YouTube & SoundCloud
     ydl_opts = {
         'quiet': True,
@@ -136,11 +155,15 @@ def extract_video_metadata(url: str):
         'no_playlist': True,
         'nocheckcertificate': True,
         'source_address': '0.0.0.0',
+        # [NOTE] cookies.txt Security & Deployment
+        # This file is not included in Git (.gitignore) for security reasons.
+        # Infused through 'Secret Files' on the Render dashboard.
+        'cookiefile': cookie_path,
         'http_headers': { 
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-us,en;q=0.5',
-        }
+        },
     }
 
     try:
@@ -185,7 +208,12 @@ def search_youtube_video(query: str):
     """
     Search YouTube via yt-dlp and return the URL of the first result.
     """
+
     logger.info(f"🔍 [Backend Search] Searching YouTube for: {query}")
+
+    cookie_path = get_cookie_path()
+    if not cookie_path:
+        logger.warning("⚠️ cookies.txt not found! YouTube request might fail.")
 
     ydl_opts = {
         'quiet': True,
@@ -194,11 +222,12 @@ def search_youtube_video(query: str):
         'noplaylist': True,
         'nocheckcertificate': True,
         'source_address': '0.0.0.0',
+        'cookiefile': cookie_path,
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-us,en;q=0.5',
-        }
+        },
     }
 
     try:
@@ -244,12 +273,16 @@ async def process_music_addition(
     if not detected_platform:
         return None  # Return None if platform is not supported
 
-    # 2. Extract Real Metadata
+    # 2. Extract Real Metadata (Modified for Non-blocking)
     # If title is generic or explicitly unknown, try to scrape
     TARGET_PLATFORMS = ["Youtube", "Soundcloud", "Spotify"]
+
     if detected_platform in TARGET_PLATFORMS:
         if title == "Unknown Title" or title.startswith("Shared by"):
-            metadata = extract_video_metadata(music_url)
+            loop = asyncio.get_event_loop()
+
+            metadata = await loop.run_in_executor(executor, extract_video_metadata, music_url)
+
             if metadata:
                 title = metadata.get("title", title)
                 artist = metadata.get("artist", artist)

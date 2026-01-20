@@ -6,8 +6,11 @@ import logging
 import jwt
 from datetime import datetime, timedelta
 from collections import defaultdict
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
+from cachetools import TTLCache
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -30,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Constants & Global Variables for WebSocket
 # ---------------------------------------------------------
 # Rate Limiting Setup (Prevent Spam)
-user_last_dj_request = defaultdict(lambda: datetime.min)
+user_last_dj_request = TTLCache(maxsize=10000, ttl=3600)
 DJ_COOLDOWN_SECONDS = 10
 BOT_USER_ID = 0
 
@@ -69,10 +72,10 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
         await websocket.close(code=4003, reason="Token Verification Failed")
         return
 
-    # -----------------------------------------------------
-    # 🏠 2. Room Validation & DB Setup
-    # -----------------------------------------------------
-    # WebSocket does not support Dependency Injection nicely, so we use SessionLocal manually
+# -----------------------------------------------------
+# 🏠 2. Room Validation & DB Setup
+# -----------------------------------------------------
+# WebSocket does not support Dependency Injection nicely, so we use SessionLocal manually
 
     db = database.SessionLocal()
 
@@ -129,6 +132,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                     # Add sender info and broadcast
                     payload["user_id"] = user_id
                     payload["username"] = username
+                    # [ADD] Save the latest status to server memory
+                    manager.update_room_state(room_id, payload)
                     await manager.broadcast_to_room(room_id, payload)
                     continue
 
@@ -180,16 +185,27 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                                                         {"type": "system", "message": "🤖 DJ VibeBot is thinking..."})
 
                         # Fetch recent chat context
-                        recent_chats_db = db.query(models.ChatMessage) \
+                        recent_chats_db = db.query(models.ChatMessage, models.User.username) \
+                            .join(models.User, models.ChatMessage.user_id == models.User.id) \
                             .filter(models.ChatMessage.room_id == room_id) \
                             .order_by(desc(models.ChatMessage.created_at)) \
                             .limit(5) \
                             .all()
 
-                        chat_history = [{"username": "User", "message": c.message} for c in recent_chats_db[::-1]]
+                        chat_history = [{"username": c.username, "message": c.ChatMessage.message}
+                                        for c in recent_chats_db[::-1]]
 
+                        # [ADD] Import Queue Context
+                        # Check songs that have not yet been played (is_played=False)
+                        queue_db = db.query(models.QueueItem) \
+                            .filter(models.QueueItem.room_id == room_id, models.QueueItem.is_played == False) \
+                            .order_by(models.QueueItem.created_at.asc()) \
+                            .limit(5) \
+                            .all()
+
+                        current_queue_context = [{"title": q.title, "artist": q.artist} for q in queue_db]
                         # Get AI Response
-                        ai_reply = await get_ai_dj_response(query, username, chat_history)
+                        ai_reply = await get_ai_dj_response(query, username, chat_history, current_queue_context)
 
                         # Save AI Response
                         ai_chat_entry = models.ChatMessage(

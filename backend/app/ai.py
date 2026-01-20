@@ -29,7 +29,7 @@ if api_key:
 executor = ThreadPoolExecutor(max_workers=4)
 
 
-async def get_ai_dj_response(user_message: str, user_name: str, chat_history: list = []) -> str:
+async def get_ai_dj_response(user_message: str, user_name: str, chat_history: list = [], current_queue: list = []) -> str:
     """
     Generate response using AI for content + yt-dlp for reliable linking.
     The AI generates a [[SONG: ...]] tag, and the backend replaces it with a real link.
@@ -50,7 +50,14 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
             content = msg.get("message", "")
             history_text += f"- {sender}: {content}\n"
 
+    # [ADD] Converting queue information to text
+    queue_text = "No music in queue."
+    if current_queue:
+        queue_titles = [f"{item['title']} - {item['artist']}" for item in current_queue]
+        queue_text = ", ".join(queue_titles)
+
     try:
+        # [Change] Adding a Current Queue Section to the Prompt
         # [Prompt Instructions]
         prompt = f"""
         [Role]
@@ -59,6 +66,7 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
         [Current Context]
         - **System Date**: {now}
         - **User**: {user_name}
+        - **Current Queue (Now Playing/Next)**: {queue_text}
 
         {history_text}
 
@@ -72,8 +80,9 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
            - **CRITICAL RULE**: Do NOT generate the YouTube link yourself. You are not good at it.
            - Instead, output a special tag: `[[SONG: Artist Name - Song Title]]`.
            - The system will automatically replace this tag with the real valid link.
-
-        3. **Chat Mode**: Answer politely and wittily.
+           - **Queue Awareness**: Check the 'Current Queue'. If a song is already there, recommend something else!
+           
+        3. **Chat Mode**: Answer politely and wittily in 1-2 sentences.
 
         [OUTPUT FORMATS - STRICT]
 
@@ -99,7 +108,7 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
             model='gemini-2.0-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
-                temperature=0.6,
+                temperature=0.7,
                 top_p=0.95,
                 top_k=40,
                 max_output_tokens=600,
@@ -134,3 +143,8 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
         # exc_info=True includes the full stack trace in the logs
         logger.error(f"AI DJ Error: {e}", exc_info=True)
         return "🤖 Sorry, I'm having trouble right now. Please try again later."
+
+def shutdown_ai_executor():
+    logger.info("Stopping AI ThreadPoolExecutor...")
+    executor.shutdown(wait=True)
+    logger.info("AI ThreadPoolExecutor shutdown complete.")
