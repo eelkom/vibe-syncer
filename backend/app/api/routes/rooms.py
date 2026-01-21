@@ -372,3 +372,156 @@ def get_room_details(room_code: str, db: Session = Depends(database.get_db)):
         host_nickname=db_room.host_nickname,
         participants=participants_list
     )
+
+
+@router.post("/{room_code}/player/next")
+async def play_next_song(
+        room_code: str,
+        token_data: dict = Depends(verify_token),
+        db: Session = Depends(database.get_db)
+):
+    """
+    Skip to the next song.
+    Logic: Mark the current top unplayed song as played, then broadcast the next one.
+    """
+    user_id = token_data["user_id"]
+    room = db.query(models.Room).filter(models.Room.room_code == room_code).first()
+
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # Check permissions: Only hosts can be controlled (annotated as needed and allowed to all)
+    if room.host_id != user_id:
+        raise HTTPException(status_code=403, detail="Only the host can skip songs.")
+
+
+    unplayed_query = db.query(models.QueueItem).filter(
+        models.QueueItem.room_id == room.id,
+        models.QueueItem.is_played == False
+    ).order_by(models.QueueItem.created_at.asc())
+
+    unplayed_songs = unplayed_query.all()
+
+    if not unplayed_songs:
+        raise HTTPException(status_code=400, detail="No songs in the queue.")
+
+    current_song = unplayed_songs[0]
+    current_song.is_played = True
+
+    next_song = None
+    if len(unplayed_songs) > 1:
+        next_song = unplayed_songs[1]
+
+    db.commit()
+
+    if next_song:
+        await manager.broadcast_to_room(room.id, {
+            "type": "player_change",
+            "action": "play",
+            "music_url": next_song.music_url,
+            "title": next_song.title,
+            "artist": next_song.artist,
+            "thumbnail_url": next_song.thumbnail_url
+        })
+    else:
+        await manager.broadcast_to_room(room.id, {
+            "type": "player_change",
+            "action": "stop",
+            "message": "Queue ended"
+        })
+
+    return {"message": "Skipped to next song", "next_song": next_song.title if next_song else "None"}
+
+
+@router.post("/{room_code}/player/prev")
+async def play_prev_song(
+        room_code: str,
+        token_data: dict = Depends(verify_token),
+        db: Session = Depends(database.get_db)
+):
+    """
+    Go back to the previous song.
+    Logic: Find the most recently played song, mark it unplayed (active), and broadcast it.
+    """
+    user_id = token_data["user_id"]
+    room = db.query(models.Room).filter(models.Room.room_code == room_code).first()
+
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    if room.host_id != user_id:
+        raise HTTPException(status_code=403, detail="Only the host can control playback.")
+
+    last_played_song = db.query(models.QueueItem).filter(
+        models.QueueItem.room_id == room.id,
+        models.QueueItem.is_played == True
+    ).order_by(models.QueueItem.created_at.desc()).first()
+
+    if not last_played_song:
+        raise HTTPException(status_code=400, detail="No previous songs found.")
+
+    last_played_song.is_played = False
+    db.commit()
+    db.refresh(last_played_song)
+
+    await manager.broadcast_to_room(room.id, {
+        "type": "player_change",
+        "action": "play",
+        "music_url": last_played_song.music_url,
+        "title": last_played_song.title,
+        "artist": last_played_song.artist,
+        "thumbnail_url": last_played_song.thumbnail_url
+    })
+
+    return {"message": "Playing previous song", "song": last_played_song.title}
+
+
+@router.post("/{room_code}/player/jump/{item_id}")
+async def jump_to_song(
+        room_code: str,
+        item_id: int,
+        token_data: dict = Depends(verify_token),
+        db: Session = Depends(database.get_db)
+):
+    """
+    Jump to a specific song in the queue.
+    Logic: Mark all songs created BEFORE this target as played. Mark target as unplayed.
+    """
+    user_id = token_data["user_id"]
+    room = db.query(models.Room).filter(models.Room.room_code == room_code).first()
+
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    if room.host_id != user_id:
+        raise HTTPException(status_code=403, detail="Only the host can jump to a song.")
+
+    target_song = db.query(models.QueueItem).filter(
+        models.QueueItem.id == item_id,
+        models.QueueItem.room_id == room.id
+    ).first()
+
+    if not target_song:
+        raise HTTPException(status_code=404, detail="Song not found.")
+
+    db.query(models.QueueItem).filter(
+        models.QueueItem.room_id == room.id,
+        models.QueueItem.created_at < target_song.created_at,
+        models.QueueItem.is_played == False
+    ).update({"is_played": True}, synchronize_session=False)
+
+    target_song.is_played = False
+
+    db.commit()
+    db.refresh(target_song)
+
+    await manager.broadcast_to_room(room.id, {
+        "type": "player_change",
+        "action": "play",
+        "music_url": target_song.music_url,
+        "title": target_song.title,
+        "artist": target_song.artist,
+        "thumbnail_url": target_song.thumbnail_url
+    })
+
+    return {"message": f"Jumped to {target_song.title}"}
