@@ -136,7 +136,16 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                     manager.update_room_state(room_id, payload)
                     await manager.broadcast_to_room(room_id, payload)
                     continue
+                # ==========================================================
+                # [ADD] 3. Late Join Sync Request Handling
+                # ==========================================================
+                if message_type == "request_sync":
+                    current_state = manager.room_state.get(room_id)
 
+                    if current_state:
+                        await websocket.send_json(current_state)
+                        logger.info(f"Sent sync state on request to user {user_id} in room {room_id}")
+                    continue
                 # --- [B] Chat & AI Logic ---
                 chat_message = payload.get("message", "")
 
