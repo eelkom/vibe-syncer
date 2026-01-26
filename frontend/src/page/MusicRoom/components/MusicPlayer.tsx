@@ -1,5 +1,5 @@
 import type { QueueResponse } from '@/schemas/queueSchema';
-import { Play, Pause, Loader2 } from 'lucide-react';
+import { Play, Pause, Loader2, SkipBack, SkipForward } from 'lucide-react';
 
 interface MusicPlayerProps {
   currentSong: QueueResponse | undefined;
@@ -10,10 +10,16 @@ interface MusicPlayerProps {
   isLoadingNextSong: boolean;
   hasError: boolean;
   isHost: boolean;
+  needsSync: boolean;
+  canPlayNext: boolean;
+  canPlayPrev: boolean;
 
   onPlay: () => void;
   onPause: () => void;
   onSeek: (amount: number) => void;
+  onSync: () => void;
+  onPlayNext: () => void;
+  onPlayPrev: () => void;
 }
 
 const MusicPlayer = ({
@@ -25,9 +31,15 @@ const MusicPlayer = ({
   isLoadingNextSong,
   hasError,
   isHost,
+  needsSync,
+  canPlayNext,
+  canPlayPrev,
   onPlay,
   onPause,
   onSeek,
+  onSync,
+  onPlayNext,
+  onPlayPrev,
 }: MusicPlayerProps) => {
   const currentTitle = currentSong?.title || 'No Song Selected';
   const currentArtist = currentSong?.artist || 'No Artist';
@@ -94,10 +106,24 @@ const MusicPlayer = ({
         </div>
 
         <div className="flex items-center justify-center gap-6">
+          {/* Previous */}
           <button
-            onClick={handlePlayPause}
-            disabled={!currentSong || !isHost}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white transition-all hover:scale-105 hover:bg-indigo-500 active:scale-95 disabled:bg-zinc-700 disabled:opacity-50"
+            onClick={onPlayPrev}
+            disabled={!isHost || !currentSong || !canPlayPrev}
+            className="text-zinc-400 transition-all hover:scale-110 hover:text-white active:scale-95 disabled:opacity-30 disabled:hover:scale-100 disabled:hover:text-zinc-400"
+          >
+            <SkipBack className="h-6 w-6" fill="currentColor" />
+          </button>
+
+          {/* Play/Pause */}
+          <button
+            onClick={needsSync ? onSync : handlePlayPause}
+            disabled={!currentSong || (!isHost && !needsSync)}
+            className={`flex h-14 w-14 items-center justify-center rounded-full text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 ${
+              needsSync
+                ? 'animate-pulse bg-emerald-600 hover:bg-emerald-500'
+                : 'bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700'
+            }`}
           >
             {!currentSong && hasError ? (
               <Play fill="currentColor" className="ml-1" />
@@ -108,6 +134,15 @@ const MusicPlayer = ({
             ) : (
               <Play fill="currentColor" className="ml-1" />
             )}
+          </button>
+
+          {/* Next */}
+          <button
+            onClick={onPlayNext}
+            disabled={!isHost || !currentSong || !canPlayNext}
+            className="text-zinc-400 transition-all hover:scale-110 hover:text-white active:scale-95 disabled:opacity-30 disabled:hover:scale-100 disabled:hover:text-zinc-400"
+          >
+            <SkipForward className="h-6 w-6" fill="currentColor" />
           </button>
         </div>
       </div>

@@ -1,16 +1,23 @@
 import Error from '@/components/ui/Error';
 import Loading from '@/components/ui/Loading';
-import useQueueList from '@/hooks/queries/useQueueList';
+import type { QueueResponse } from '@/schemas/queueSchema';
 import { useEffect, useRef } from 'react';
-import { Check } from 'lucide-react';
 
 interface QueueBoardProps {
-  queueList: ReturnType<typeof useQueueList>['data'];
+  queueList: QueueResponse[] | undefined;
   isLoading: boolean;
   isError: boolean;
+  currentSongId: number;
+  onJumpSong: (itemId: number) => void;
 }
 
-const QueueBoard = ({ queueList, isLoading, isError }: QueueBoardProps) => {
+const QueueBoard = ({
+  queueList,
+  isLoading,
+  isError,
+  currentSongId,
+  onJumpSong,
+}: QueueBoardProps) => {
   const queueContainerRef = useRef<HTMLDivElement>(null);
   const currentSongRef = useRef<HTMLDivElement>(null);
   const previousQueueLengthRef = useRef(0);
@@ -54,48 +61,43 @@ const QueueBoard = ({ queueList, isLoading, isError }: QueueBoardProps) => {
           ) : (
             queueList &&
             queueList.length > 0 &&
-            queueList?.map((song, index) => {
-              const isCurrentSong =
-                index === 0 ||
-                (index > 0 &&
-                  queueList[index - 1].is_played &&
-                  !song.is_played);
-
-              return (
-                <div
-                  key={song.id}
-                  ref={isCurrentSong ? currentSongRef : null}
-                  className={`group cursor-pointer rounded-2xl p-4 transition-all ${
-                    song.is_played
-                      ? 'bg-gray-100 opacity-60'
-                      : isCurrentSong
-                        ? 'bg-indigo-50 ring-2 ring-indigo-500'
-                        : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 w-6 font-mono text-xs text-gray-400">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate text-sm ${
-                          song.is_played ? 'text-gray-600' : 'text-gray-900'
-                        }`}
-                      >
-                        {song.title}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-gray-500">
-                        {song.artist}
-                      </p>
+            (() => {
+              return queueList.map((song, index) => {
+                const isCurrentSong = song.id === currentSongId;
+                return (
+                  <div
+                    key={song.id}
+                    ref={isCurrentSong ? currentSongRef : null}
+                    onClick={() => onJumpSong(song.id)}
+                    className={`group cursor-pointer rounded-2xl p-4 transition-all ${
+                      song.is_played
+                        ? 'bg-gray-100 opacity-60'
+                        : isCurrentSong
+                          ? 'bg-indigo-50 ring-2 ring-indigo-500'
+                          : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 w-6 font-mono text-xs text-gray-400">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`truncate text-sm ${
+                            song.is_played ? 'text-gray-600' : 'text-gray-900'
+                          }`}
+                        >
+                          {song.title}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-gray-500">
+                          {song.artist}
+                        </p>
+                      </div>
                     </div>
-                    {song.is_played && (
-                      <Check className="h-4 w-4 text-green-500" />
-                    )}
                   </div>
-                </div>
-              );
-            })
+                );
+              });
+            })()
           )}
           {!isLoading && queueList?.length === 0 && (
             <div className="flex h-full w-full items-center justify-center">

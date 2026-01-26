@@ -49,8 +49,6 @@ const useWebSocket = (roomCode: string) => {
       setConnectionStatus('connecting');
 
       const ws = new WebSocket(`${WS_BASE_URL}/${roomCode}?token=${token}`);
-
-      // VITE_WS_BASE_URL=wss://vibesyncer-backend.onrender.com/ws
       socketRef.current = ws;
 
       ws.onopen = () => {

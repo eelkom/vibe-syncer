@@ -5,7 +5,7 @@ export const QueueResponseSchema = z.object({
   artist: z.string(),
   music_url: z.string(),
   thumbnail_url: z.string().nullable(),
-  user_id: z.number(),
+  user_id: z.number().optional(),
   id: z.number(),
   room_id: z.number(),
   platform: z.string(),
