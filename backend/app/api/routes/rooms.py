@@ -430,6 +430,11 @@ async def play_next_song(
             "message": "Queue ended"
         })
 
+    await manager.broadcast_to_room(room.id,{
+        "type": "queue_update",
+        "event": "refresh"
+    })
+
     return {"message": "Skipped to next song", "next_song": next_song.title if next_song else "None"}
 
 
@@ -471,6 +476,11 @@ async def play_prev_song(
         "title": last_played_song.title,
         "artist": last_played_song.artist,
         "thumbnail_url": last_played_song.thumbnail_url
+    })
+
+    await manager.broadcast_to_room(room.id,{
+        "type": "queue_update",
+        "event": "refresh"
     })
 
     return {"message": "Playing previous song", "song": last_played_song.title}
@@ -522,6 +532,11 @@ async def jump_to_song(
         "title": target_song.title,
         "artist": target_song.artist,
         "thumbnail_url": target_song.thumbnail_url
+    })
+
+    await manager.broadcast_to_room(room.id,{
+        "type": "queue_update",
+        "event": "refresh"
     })
 
     return {"message": f"Jumped to {target_song.title}"}

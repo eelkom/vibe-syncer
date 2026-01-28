@@ -61,7 +61,6 @@ class QueueCreate(BaseModel):
     artist: str = Field(..., description="Artist name", example="IU")
     music_url: str = Field(..., description="URL of the music")
     thumbnail_url: Optional[str] = Field(None, description="URL of the album cover")
-    user_id: int = Field(..., description="ID of the user who added the song")
 
 
 class QueueResponse(QueueCreate):
