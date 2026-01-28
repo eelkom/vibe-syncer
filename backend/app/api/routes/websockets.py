@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 # Import dependencies
 from app import database
 from app.models import models
-from app.ai import get_ai_dj_response
+from app.ai import get_ai_dj_response, get_ai_welcome_message
 from app.utils import process_music_addition
 from app.core.websocket_manager import manager
 from app.auth import SECRET_KEY, ALGORITHM
@@ -105,6 +105,32 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
             "type": "system",
             "message": f"{username} has joined the room."
         })
+
+        try:
+            welcome_msg = await get_ai_welcome_message(username)
+
+            ai_chat_entry = models.ChatMessage(
+                room_id=room_id,
+                user_id=BOT_USER_ID,
+                message=f"[VibeBot] {welcome_msg}"
+            )
+            db.add(ai_chat_entry)
+            db.commit()
+
+            await manager.broadcast_to_room(room_id, {
+                "type": "chat",
+                "user_id": BOT_USER_ID,
+                "username": "🤖 VibeBot",
+                "message": welcome_msg,
+                "created_at": datetime.now().isoformat()
+            })
+
+            logger.info(f"AI Welcome message sent to {username} in room {room_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to send AI welcome message: {e}")
+            pass
+        # ==========================================================
 
         # Regex for URL detection
         url_pattern = re.compile(r'(https?://\S+)')

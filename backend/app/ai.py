@@ -209,3 +209,41 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
         # exc_info=True includes the full stack trace in the logs
         logger.error(f"AI DJ Error: {e}", exc_info=True)
         return "🤖 Sorry, I'm having trouble right now. Please try again later."
+
+
+async def get_ai_welcome_message(username: str) -> str:
+    """
+    Generates a welcome message when a new user enters.
+    """
+    if not client:
+        return f"Hello {username}! Welcome to our music trip! 🎧"
+
+    prompt = f"""
+    [Role]
+    You are 'VibeBot', a cool and witty AI DJ in a music sharing room.
+
+    [Task]
+    A new user named '{username}' just joined the room.
+    Generate a short, fun, and welcoming message for them in English.
+
+    [Rules]
+    - Keep it short (1 sentence).
+    - Be friendly and enthusiastic (Use emojis like 🎵, 👋, 🎧).
+    - Language: English.
+
+    VibeBot:
+    """
+
+    try:
+        response = await client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.8,
+                max_output_tokens=100
+            )
+        )
+        return response.text.strip()
+    except Exception as e:
+        logger.error(f"AI Welcome Error: {e}")
+        return f"Hello {username}! Welcome to our music trip! 🎧"
