@@ -223,7 +223,9 @@ def get_room_queue(room_code: str, db: Session = Depends(database.get_db)):
     room = db.query(models.Room).filter(models.Room.room_code == room_code).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
-    return db.query(models.QueueItem).filter(models.QueueItem.room_id == room.id).all()
+    return db.query(models.QueueItem).filter(
+        models.QueueItem.room_id == room.id
+    ).order_by(models.QueueItem.created_at.asc()).all()
 
 
 @router.post("/{room_code}/queue", response_model=schemas.QueueResponse)
