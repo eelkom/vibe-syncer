@@ -19,7 +19,6 @@ const ParticipantsModal = ({
   onOpenChange,
   participants,
 }: ParticipantsModalProps) => {
-  console.log(participants);
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
