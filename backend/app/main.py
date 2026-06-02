@@ -83,5 +83,6 @@ app.include_router(websockets.router, tags=["websockets"])
 # Root Endpoint (Health Check)
 # ---------------------------------------------------------
 @app.get("/")
+@app.head("/")
 def read_root():
     return {"message": "VibeSyncer Backend is Running!"}
