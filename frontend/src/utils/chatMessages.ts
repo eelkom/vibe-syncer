@@ -11,7 +11,8 @@ const getMessageTime = (msg: ChatMessage) => {
   return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
 };
 
-const normalizeContent = (msg: ChatMessage) =>
+/** Message text for display and comparison, without the stored bot prefix. */
+export const getDisplayMessage = (msg: ChatMessage) =>
   msg.user_id === BOT_USER_ID && msg.message.startsWith(BOT_MESSAGE_PREFIX)
     ? msg.message.slice(BOT_MESSAGE_PREFIX.length)
     : msg.message;
@@ -24,7 +25,7 @@ const normalizeContent = (msg: ChatMessage) =>
  */
 const isSameMessage = (live: ChatMessage, saved: ChatMessage) =>
   live.user_id === saved.user_id &&
-  normalizeContent(live) === normalizeContent(saved) &&
+  getDisplayMessage(live) === getDisplayMessage(saved) &&
   (live.user_id === BOT_USER_ID ||
     getMessageTime(live) === getMessageTime(saved));
 
