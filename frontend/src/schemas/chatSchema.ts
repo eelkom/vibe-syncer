@@ -11,3 +11,11 @@ export const ChatMessageResponseSchema = z.object({
 });
 
 export type ChatMessageResponse = z.infer<typeof ChatMessageResponseSchema>;
+
+// WebSocket chat broadcasts don't include `id` and `room_id`
+export const ChatMessageSchema = ChatMessageResponseSchema.partial({
+  id: true,
+  room_id: true,
+});
+
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
