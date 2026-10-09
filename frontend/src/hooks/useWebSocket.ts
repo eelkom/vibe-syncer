@@ -15,6 +15,18 @@ type WebSocketConnectionStatus =
   | 'disconnected'
   | 'error';
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+const BASE_RECONNECT_DELAY_MS = 1000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+
+/**
+ * Full jitter backoff: random delay in [0, min(cap, base * 2^attempt))
+ * so that clients disconnected together do not reconnect at the same moment.
+ */
+const getReconnectDelay = (attempt: number) =>
+  Math.random() *
+  Math.min(MAX_RECONNECT_DELAY_MS, BASE_RECONNECT_DELAY_MS * 2 ** attempt);
+
 /**
  * Custom hook for managing WebSocket connection to a music room
  * @param roomCode - Unique identifier for the room
@@ -30,9 +42,16 @@ const useWebSocket = (roomCode: string) => {
     useState<WebSocketConnectionStatus>('disconnected');
 
   const reconnectRef = useRef(0);
-  const maxReconnectAttempts = 5;
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const isManualCloseRef = useRef(false);
+
+  const clearReconnectTimer = () => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+  };
 
   const user = JSON.parse(sessionStorage.getItem('user') || 'null');
   const token = user?.token;
@@ -42,6 +61,8 @@ const useWebSocket = (roomCode: string) => {
 
     let isComponentMounted = true;
     isMountedRef.current = true;
+    isManualCloseRef.current = false;
+    reconnectRef.current = 0;
 
     const connectWebSocket = () => {
       if (!isComponentMounted || !isMountedRef.current) return;
@@ -108,14 +129,17 @@ const useWebSocket = (roomCode: string) => {
         logger.log('[WS] Closed');
         setConnectionStatus('disconnected');
 
-        if (reconnectRef.current < maxReconnectAttempts) {
-          const delay = Math.min(
-            1000 * Math.pow(2, reconnectRef.current),
-            30000,
-          );
-          logger.log(`[WS] Reconnecting in ${delay}ms...`);
+        if (isManualCloseRef.current) return;
 
+        if (reconnectRef.current < MAX_RECONNECT_ATTEMPTS) {
+          const delay = getReconnectDelay(reconnectRef.current);
+          logger.debug(
+            `[WS] 재연결 시도 ${reconnectRef.current + 1}회차, 대기 ${Math.round(delay)}ms`,
+          );
+
+          clearReconnectTimer();
           reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectTimeoutRef.current = null;
             if (isComponentMounted && isMountedRef.current) {
               reconnectRef.current++;
               connectWebSocket();
@@ -134,9 +158,7 @@ const useWebSocket = (roomCode: string) => {
       isComponentMounted = false;
       isMountedRef.current = false;
 
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      clearReconnectTimer();
 
       if (
         socketRef.current &&
@@ -148,6 +170,13 @@ const useWebSocket = (roomCode: string) => {
     };
   }, [roomCode, token, queryClient]);
 
+  /** Close the connection on purpose; no reconnect is scheduled afterwards. */
+  const disconnect = () => {
+    isManualCloseRef.current = true;
+    clearReconnectTimer();
+    socketRef.current?.close();
+  };
+
   const sendMessage = (data: object) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(data));
@@ -158,6 +187,7 @@ const useWebSocket = (roomCode: string) => {
 
   return {
     sendMessage,
+    disconnect,
     newMessage,
     connectionStatus,
     isAiLoading,
