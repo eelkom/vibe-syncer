@@ -4,6 +4,7 @@ import { BOT_USER_ID } from '@/constants/chat';
 import useChatMessages from '@/hooks/queries/useChatMessages';
 import type { SubscribeSocket } from '@/hooks/useWebSocket';
 import type { UserData } from '@/types/user';
+import { getDisplayMessage } from '@/utils/chatMessages';
 import { getMessageId } from '@/utils/getMessageId';
 import { Bot, Send } from 'lucide-react';
 import useChatBoard from '../hooks/useChatBoard';
@@ -96,7 +97,7 @@ const ChatBoard = ({
                     <p className="mb-1 text-xs opacity-60">{msg.username}</p>
                   )}
                   <p className="whitespace-normal break-words text-sm">
-                    {msg.message}
+                    {getDisplayMessage(msg)}
                   </p>
                 </div>
               </div>
