@@ -288,6 +288,10 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
 
         except WebSocketDisconnect:
             manager.disconnect(websocket, room_id)
+        except Exception:
+            # Don't leave a dead connection in the room on unexpected errors
+            logger.exception(f"WebSocket loop failed for user {user_id} in room {room_id}")
+            manager.disconnect(websocket, room_id)
 
     finally:
         # Always close the manual session
