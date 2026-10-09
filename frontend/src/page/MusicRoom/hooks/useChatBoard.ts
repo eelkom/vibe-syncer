@@ -1,3 +1,4 @@
+import { AI_THINKING_MESSAGE, BOT_USER_ID } from '@/constants/chat';
 import type { SubscribeSocket } from '@/hooks/useWebSocket';
 import {
   addLiveChatMessage,
@@ -17,8 +18,6 @@ interface UseChatBoardProps {
 }
 
 const MAX_MESSAGE_LENGTH = 100;
-const BOT_USER_ID = 0;
-const AI_THINKING_MESSAGE = '🤖 DJ VibeBot is thinking...';
 
 const useChatBoard = ({
   sendMessage,

@@ -1,11 +1,9 @@
+import { BOT_MESSAGE_PREFIX, BOT_USER_ID } from '@/constants/chat';
 import type { ChatMessage } from '@/schemas/chatSchema';
 import { getMessageId } from '@/utils/getMessageId';
 
 export type ChatMessageMap = Map<string, ChatMessage>;
 
-const BOT_USER_ID = 0;
-// The server stores bot messages with this prefix but broadcasts them without it
-const BOT_MESSAGE_PREFIX = '[VibeBot] ';
 const TIMEZONE_PATTERN = /(Z|[+-]\d{2}:?\d{2})$/i;
 
 const getMessageTime = (msg: ChatMessage) => {
