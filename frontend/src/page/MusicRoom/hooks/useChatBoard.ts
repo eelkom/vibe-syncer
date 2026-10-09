@@ -1,6 +1,10 @@
+import { AI_THINKING_MESSAGE, BOT_USER_ID } from '@/constants/chat';
 import type { SubscribeSocket } from '@/hooks/useWebSocket';
-import type { ChatMessage } from '@/schemas/chatSchema';
-import { getMessageId } from '@/utils/getMessageId';
+import {
+  addLiveChatMessage,
+  normalizeLiveMessage,
+  type ChatMessageMap,
+} from '@/utils/chatMessages';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -8,14 +12,12 @@ import { toast } from 'react-toastify';
 interface UseChatBoardProps {
   sendMessage: (messageData: object) => void;
   subscribe: SubscribeSocket;
-  chatMessages: Map<string, ChatMessage> | undefined;
+  chatMessages: ChatMessageMap | undefined;
   roomCode: string;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
 }
 
 const MAX_MESSAGE_LENGTH = 100;
-const BOT_USER_ID = 0;
-const AI_THINKING_MESSAGE = '🤖 DJ VibeBot is thinking...';
 
 const useChatBoard = ({
   sendMessage,
@@ -35,13 +37,10 @@ const useChatBoard = ({
         setIsAiLoading(false);
       }
 
-      queryClient.setQueryData(
+      const liveMessage = normalizeLiveMessage(message);
+      queryClient.setQueryData<ChatMessageMap>(
         ['chatMessages', roomCode],
-        (prevMap: Map<string, ChatMessage> | undefined) => {
-          const updated = new Map(prevMap || []);
-          updated.set(getMessageId(message), message);
-          return updated;
-        },
+        (prevMap) => addLiveChatMessage(prevMap, liveMessage),
       );
     });
 
