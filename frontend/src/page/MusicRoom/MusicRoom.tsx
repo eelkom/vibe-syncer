@@ -16,6 +16,7 @@ import RoomTitle from './components/RoomTitle';
 import useMusicPlayer from './hooks/useMusicPlayer';
 import Header from './components/Header';
 import useCurrentSongInfo from './hooks/useCurrentSongInfo';
+import { useQueryClient } from '@tanstack/react-query';
 
 const MusicRoom = () => {
   const navigate = useNavigate();
@@ -28,8 +29,16 @@ const MusicRoom = () => {
     isError: isQueueError,
   } = useQueueList(roomCode || '');
 
-  const { sendMessage, newMessage, connectionStatus, isAiLoading } =
-    useWebSocket(roomCode || '');
+  const queryClient = useQueryClient();
+  const { sendMessage, subscribe, connectionStatus } = useWebSocket(
+    roomCode || '',
+  );
+
+  useEffect(() => {
+    return subscribe('queue_update', () => {
+      queryClient.invalidateQueries({ queryKey: ['queueList', roomCode] });
+    });
+  }, [subscribe, queryClient, roomCode]);
 
   const {
     currentSong,
@@ -69,7 +78,7 @@ const MusicRoom = () => {
   } = useMusicPlayer({
     roomCode: roomCode || '',
     sendMessage,
-    newMessage,
+    subscribe,
     user,
     currentSong,
     onSongEnded: () => {
@@ -168,9 +177,8 @@ const MusicRoom = () => {
             currentUser={user}
             roomCode={roomCode || ''}
             sendMessage={sendMessage}
-            newMessage={newMessage}
+            subscribe={subscribe}
             connectionStatus={connectionStatus}
-            isAiLoading={isAiLoading}
           />
         </ErrorBoundary>
       </div>

@@ -1,4 +1,5 @@
-import type { ChatMessageResponse } from '@/schemas/chatSchema';
+import type { SubscribeSocket } from '@/hooks/useWebSocket';
+import type { ChatMessage } from '@/schemas/chatSchema';
 import { getMessageId } from '@/utils/getMessageId';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -6,37 +7,55 @@ import { toast } from 'react-toastify';
 
 interface UseChatBoardProps {
   sendMessage: (messageData: object) => void;
-  newMessage: ChatMessageResponse | undefined;
+  subscribe: SubscribeSocket;
+  chatMessages: Map<string, ChatMessage> | undefined;
   roomCode: string;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
-  isAiLoading: boolean;
 }
 
 const MAX_MESSAGE_LENGTH = 100;
+const BOT_USER_ID = 0;
+const AI_THINKING_MESSAGE = '🤖 DJ VibeBot is thinking...';
 
 const useChatBoard = ({
   sendMessage,
-  newMessage,
+  subscribe,
+  chatMessages,
   roomCode,
   connectionStatus,
-  isAiLoading,
 }: UseChatBoardProps) => {
   const queryClient = useQueryClient();
   const [newTextInput, setNewTextInput] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (newMessage && newMessage.type === 'chat') {
+    const unsubscribeChat = subscribe('chat', (message) => {
+      if (message.user_id === BOT_USER_ID) {
+        setIsAiLoading(false);
+      }
+
       queryClient.setQueryData(
         ['chatMessages', roomCode],
-        (prevMap: Map<string, ChatMessageResponse> | undefined) => {
+        (prevMap: Map<string, ChatMessage> | undefined) => {
           const updated = new Map(prevMap || []);
-          updated.set(getMessageId(newMessage), newMessage);
+          updated.set(getMessageId(message), message);
           return updated;
         },
       );
-    }
-  }, [newMessage, roomCode, queryClient]);
+    });
+
+    const unsubscribeSystem = subscribe('system', (message) => {
+      if (message.message === AI_THINKING_MESSAGE) {
+        setIsAiLoading(true);
+      }
+    });
+
+    return () => {
+      unsubscribeChat();
+      unsubscribeSystem();
+    };
+  }, [subscribe, roomCode, queryClient]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -45,7 +64,7 @@ const useChatBoard = ({
         behavior: 'smooth',
       });
     }
-  }, [newMessage, isAiLoading]);
+  }, [chatMessages, isAiLoading]);
 
   const trySendMessage = (textToSend: string) => {
     const trimmed = textToSend.trim();
@@ -89,6 +108,7 @@ const useChatBoard = ({
   return {
     chatContainerRef,
     newTextInput,
+    isAiLoading,
     handleSendMessage,
     handleAiAsk,
     handleInputChange,

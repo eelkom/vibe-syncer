@@ -1,7 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { logger } from '@/utils/logger';
-import type { ChatMessageResponse } from '@/schemas/chatSchema';
-import { useQueryClient } from '@tanstack/react-query';
+import {
+  SocketMessageSchema,
+  type SocketMessageMap,
+  type SocketMessageType,
+} from '@/schemas/socketSchema';
 
 const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL;
 if (!WS_BASE_URL) {
@@ -14,6 +17,17 @@ type WebSocketConnectionStatus =
   | 'connected'
   | 'disconnected'
   | 'error';
+
+type SocketListener<T extends SocketMessageType> = (
+  message: SocketMessageMap[T],
+) => void;
+
+type SocketListeners = { [K in SocketMessageType]: Set<SocketListener<K>> };
+
+export type SubscribeSocket = <T extends SocketMessageType>(
+  type: T,
+  listener: SocketListener<T>,
+) => () => void;
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_RECONNECT_DELAY_MS = 1000;
@@ -34,10 +48,13 @@ const getReconnectDelay = (attempt: number) =>
  * @returns WebSocket utilities including sendMessage function and connection status
  */
 const useWebSocket = (roomCode: string) => {
-  const queryClient = useQueryClient();
   const socketRef = useRef<WebSocket | null>(null);
-  const [newMessage, setNewMessage] = useState<ChatMessageResponse>();
-  const [isAiLoading, setIsAiLoading] = useState(false);
+  const listenersRef = useRef<SocketListeners>({
+    sync: new Set(),
+    chat: new Set(),
+    system: new Set(),
+    queue_update: new Set(),
+  });
   const [connectionStatus, setConnectionStatus] =
     useState<WebSocketConnectionStatus>('disconnected');
 
@@ -52,6 +69,19 @@ const useWebSocket = (roomCode: string) => {
       reconnectTimeoutRef.current = null;
     }
   };
+
+  /**
+   * Register a listener for a message type. Listeners are called synchronously
+   * for every received message, so bursts of messages are never coalesced.
+   * @returns unsubscribe function
+   */
+  const subscribe: SubscribeSocket = useCallback((type, listener) => {
+    const listeners = listenersRef.current[type];
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
 
   const user = JSON.parse(sessionStorage.getItem('user') || 'null');
   const token = user?.token;
@@ -82,38 +112,50 @@ const useWebSocket = (roomCode: string) => {
         reconnectRef.current = 0;
       };
 
+      const dispatch = <T extends SocketMessageType>(
+        type: T,
+        message: SocketMessageMap[T],
+      ) => {
+        listenersRef.current[type].forEach((listener) => {
+          try {
+            listener(message);
+          } catch (error) {
+            logger.error(`[WS] Listener for "${type}" failed:`, error);
+          }
+        });
+      };
+
       ws.onmessage = (event) => {
         if (!isComponentMounted || !isMountedRef.current) return;
+
+        let data: unknown;
         try {
-          const data = JSON.parse(event.data);
-
-          if (
-            data.type === 'system' &&
-            data.message === '🤖 DJ VibeBot is thinking...'
-          ) {
-            setIsAiLoading(true);
-            return;
-          }
-
-          if (data.user_id === 0) {
-            setIsAiLoading(false);
-            setNewMessage(data);
-            return;
-          }
-
-          if (data.type === 'queue_update') {
-            queryClient.invalidateQueries({
-              queryKey: ['queueList', roomCode],
-            });
-            return;
-          }
-
-          if (data.type === 'sync' || data.type === 'chat') {
-            setNewMessage(data);
-            return;
-          }
+          data = JSON.parse(event.data);
         } catch (error) {
           logger.error('[WS] Failed to parse message:', error);
+          return;
+        }
+
+        const result = SocketMessageSchema.safeParse(data);
+        if (!result.success) {
+          logger.log('[WS] Ignored unsupported message:', data);
+          return;
+        }
+
+        const message = result.data;
+        switch (message.type) {
+          case 'sync':
+            dispatch('sync', message);
+            break;
+          case 'chat':
+            dispatch('chat', message);
+            break;
+          case 'system':
+            dispatch('system', message);
+            break;
+          case 'queue_update':
+            dispatch('queue_update', message);
+            break;
         }
       };
 
@@ -168,7 +210,7 @@ const useWebSocket = (roomCode: string) => {
         socketRef.current.close();
       }
     };
-  }, [roomCode, token, queryClient]);
+  }, [roomCode, token]);
 
   /** Close the connection on purpose; no reconnect is scheduled afterwards. */
   const disconnect = () => {
@@ -188,9 +230,8 @@ const useWebSocket = (roomCode: string) => {
   return {
     sendMessage,
     disconnect,
-    newMessage,
+    subscribe,
     connectionStatus,
-    isAiLoading,
   };
 };
 
