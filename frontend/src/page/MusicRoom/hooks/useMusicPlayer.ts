@@ -5,9 +5,25 @@ import type { SubscribeSocket } from '@/hooks/useWebSocket';
 import type { QueueResponse } from '@/schemas/queueSchema';
 import type { SyncSocketMessage } from '@/schemas/socketSchema';
 import type { UserData } from '@/types/user';
+import { logger } from '@/utils/logger';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type ReactPlayer from 'react-player';
 import type { OnProgressProps } from 'react-player/base';
+
+interface YouTubeInternalPlayer {
+  unMute: () => void;
+  playVideo: () => void;
+}
+
+const isYouTubeInternalPlayer = (
+  player: unknown,
+): player is YouTubeInternalPlayer =>
+  typeof player === 'object' &&
+  player !== null &&
+  'unMute' in player &&
+  typeof player.unMute === 'function' &&
+  'playVideo' in player &&
+  typeof player.playVideo === 'function';
 
 interface UseMusicPlayerProps {
   roomCode: string;
@@ -31,12 +47,18 @@ const useMusicPlayer = ({
   const pendingSyncRef = useRef<{ timestamp?: number; action: string } | null>(
     null,
   );
+  // Ready state of the currently mounted player (it remounts on every song)
+  const isPlayerReadyRef = useRef(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const [isPlayerEnabled, setIsPlayerEnabled] = useState(user?.isHost ?? false);
+  // Guests start playing muted right away; browsers allow muted autoplay
+  const [isPlayerEnabled, setIsPlayerEnabled] = useState(true);
+  const [hasUnmuted, setHasUnmuted] = useState(false);
   const [duration, setDuration] = useState(0);
+
+  const isMuted = !user?.isHost && !hasUnmuted;
 
   const { mutate: playNext } = usePlayNextSong(roomCode || '');
   const { mutate: playPrev } = usePlayPrevSong(roomCode || '');
@@ -47,6 +69,11 @@ const useMusicPlayer = ({
       setIsPlaying(true);
     });
   }, [currentSong]);
+
+  useEffect(() => {
+    isPlayerReadyRef.current = false;
+    pendingSyncRef.current = null;
+  }, [currentSong?.music_url]);
 
   const clearPendingSeek = () => {
     if (seekTimeoutRef.current) {
@@ -63,6 +90,16 @@ const useMusicPlayer = ({
 
     if (!user?.isHost && !isPlayerEnabled) {
       pendingSyncRef.current = { timestamp, action };
+      return;
+    }
+
+    // seekTo is ignored until the player is ready, so apply it in handleReady
+    if (!user?.isHost && !isPlayerReadyRef.current) {
+      if (action === 'play') setIsPlaying(true);
+      if (action === 'pause') setIsPlaying(false);
+      if (timestamp !== undefined) {
+        pendingSyncRef.current = { timestamp, action: 'seek_on_ready' };
+      }
       return;
     }
 
@@ -204,7 +241,21 @@ const useMusicPlayer = ({
     }
   };
 
+  const handleUnmute = () => {
+    // Call the player directly inside the click handler: browsers only allow
+    // unmuting within a user gesture
+    const internalPlayer = playerRef.current?.getInternalPlayer();
+    if (isYouTubeInternalPlayer(internalPlayer)) {
+      internalPlayer.unMute();
+      // Some browsers pause playback on unmute; keep playing if we should be
+      if (isPlaying) internalPlayer.playVideo();
+    }
+    setHasUnmuted(true);
+    logger.log('[Player] Unmuted by user');
+  };
+
   const handleReady = () => {
+    isPlayerReadyRef.current = true;
     setIsReady(true);
     const pending = pendingSyncRef.current;
     if (
@@ -239,6 +290,7 @@ const useMusicPlayer = ({
     played,
     isReady,
     isPlayerEnabled,
+    isMuted,
     duration,
     handlePlayNext,
     handlePlayPrev,
@@ -247,6 +299,7 @@ const useMusicPlayer = ({
     handlePause,
     handleSeek,
     handleSync,
+    handleUnmute,
     handleReady,
     handleError,
     handleEnded,

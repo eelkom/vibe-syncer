@@ -1,5 +1,12 @@
 import type { QueueResponse } from '@/schemas/queueSchema';
-import { Play, Pause, Loader2, SkipBack, SkipForward } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  Loader2,
+  SkipBack,
+  SkipForward,
+  VolumeX,
+} from 'lucide-react';
 
 interface MusicPlayerProps {
   currentSong: QueueResponse | undefined;
@@ -11,6 +18,7 @@ interface MusicPlayerProps {
   hasError: boolean;
   isHost: boolean;
   needsSync: boolean;
+  showUnmute: boolean;
   canPlayNext: boolean;
   canPlayPrev: boolean;
 
@@ -18,6 +26,7 @@ interface MusicPlayerProps {
   onPause: () => void;
   onSeek: (amount: number) => void;
   onSync: () => void;
+  onUnmute: () => void;
   onPlayNext: () => void;
   onPlayPrev: () => void;
 }
@@ -32,12 +41,14 @@ const MusicPlayer = ({
   hasError,
   isHost,
   needsSync,
+  showUnmute,
   canPlayNext,
   canPlayPrev,
   onPlay,
   onPause,
   onSeek,
   onSync,
+  onUnmute,
   onPlayNext,
   onPlayPrev,
 }: MusicPlayerProps) => {
@@ -145,6 +156,16 @@ const MusicPlayer = ({
             <SkipForward className="h-6 w-6" fill="currentColor" />
           </button>
         </div>
+
+        {showUnmute && currentSong && (
+          <button
+            onClick={onUnmute}
+            className="mx-auto flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm text-white transition-all hover:bg-indigo-500 active:scale-95"
+          >
+            <VolumeX className="h-4 w-4" />
+            탭하여 소리 켜기
+          </button>
+        )}
       </div>
     </div>
   );
