@@ -62,6 +62,7 @@ const MusicRoom = () => {
     played,
     isReady,
     isPlayerEnabled,
+    isMuted,
     duration,
     handlePlayNext,
     handlePlayPrev,
@@ -70,6 +71,7 @@ const MusicRoom = () => {
     handlePause,
     handleSeek,
     handleSync,
+    handleUnmute,
     handleReady,
     handleError,
     handleEnded,
@@ -137,6 +139,8 @@ const MusicRoom = () => {
                 ref={playerRef}
                 url={currentSongUrl}
                 playing={isPlaying}
+                muted={isMuted}
+                playsinline
                 width="100%"
                 height="100%"
                 onReady={handleReady}
@@ -160,12 +164,14 @@ const MusicRoom = () => {
             hasError={isPatchError}
             isHost={user?.isHost ?? false}
             needsSync={!user?.isHost && !isPlayerEnabled}
+            showUnmute={!user?.isHost && isPlayerEnabled && isMuted}
             onPlay={handlePlay}
             onPause={handlePause}
             onSeek={(amount) => {
               handleSeek(amount);
             }}
             onSync={handleSync}
+            onUnmute={handleUnmute}
             onPlayNext={handlePlayNext}
             onPlayPrev={handlePlayPrev}
             canPlayNext={canPlayNext}
