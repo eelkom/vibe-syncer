@@ -10,6 +10,16 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type ReactPlayer from 'react-player';
 import type { OnProgressProps } from 'react-player/base';
 
+// Muted autoplay counts as failed if playback hasn't started within this time
+const AUTOPLAY_TIMEOUT_MS = 2000;
+
+type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
+
+interface PendingSync {
+  timestamp?: number;
+  action: string;
+}
+
 interface YouTubeInternalPlayer {
   unMute: () => void;
   playVideo: () => void;
@@ -44,11 +54,12 @@ const useMusicPlayer = ({
 }: UseMusicPlayerProps) => {
   const playerRef = useRef<ReactPlayer>(null);
   const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingSyncRef = useRef<{ timestamp?: number; action: string } | null>(
-    null,
-  );
+  const pendingSyncRef = useRef<PendingSync | null>(null);
+  // Latest host state for the current song, used when falling back
+  const lastSyncRef = useRef<PendingSync | null>(null);
   // Ready state of the currently mounted player (it remounts on every song)
   const isPlayerReadyRef = useRef(false);
+  const isActuallyPlayingRef = useRef(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
@@ -56,9 +67,23 @@ const useMusicPlayer = ({
   // Guests start playing muted right away; browsers allow muted autoplay
   const [isPlayerEnabled, setIsPlayerEnabled] = useState(true);
   const [hasUnmuted, setHasUnmuted] = useState(false);
+  const [readySongUrl, setReadySongUrl] = useState<string>();
   const [duration, setDuration] = useState(0);
 
   const isMuted = !user?.isHost && !hasUnmuted;
+  const guestPlaybackMode: GuestPlaybackMode | null = user?.isHost
+    ? null
+    : !isPlayerEnabled
+      ? 'fallback'
+      : isMuted
+        ? 'muted-autoplay'
+        : 'unmuted';
+  const shouldWatchAutoplay =
+    !user?.isHost &&
+    isPlayerEnabled &&
+    isPlaying &&
+    readySongUrl !== undefined &&
+    readySongUrl === currentSong?.music_url;
 
   const { mutate: playNext } = usePlayNextSong(roomCode || '');
   const { mutate: playPrev } = usePlayPrevSong(roomCode || '');
@@ -72,8 +97,44 @@ const useMusicPlayer = ({
 
   useEffect(() => {
     isPlayerReadyRef.current = false;
+    isActuallyPlayingRef.current = false;
     pendingSyncRef.current = null;
+    lastSyncRef.current = null;
   }, [currentSong?.music_url]);
+
+  useEffect(() => {
+    if (guestPlaybackMode) {
+      logger.log(`[Player] Guest playback mode: ${guestPlaybackMode}`);
+    }
+  }, [guestPlaybackMode]);
+
+  const fallbackToPendingSync = (reason: string) => {
+    if (user?.isHost || !isPlayerEnabled) return;
+
+    logger.log(`[Player] Autoplay failed (${reason}), falling back`);
+    pendingSyncRef.current = lastSyncRef.current;
+    // The player unmounts, so the next mount has to become ready again
+    isPlayerReadyRef.current = false;
+    isActuallyPlayingRef.current = false;
+    setReadySongUrl(undefined);
+    setIsPlayerEnabled(false);
+  };
+
+  const handleAutoplayTimeout = useEffectEvent(() => {
+    if (!isActuallyPlayingRef.current) {
+      fallbackToPendingSync('playback did not start');
+    }
+  });
+
+  useEffect(() => {
+    if (!shouldWatchAutoplay) return;
+
+    const timer = setTimeout(() => {
+      handleAutoplayTimeout();
+    }, AUTOPLAY_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [shouldWatchAutoplay]);
 
   const clearPendingSeek = () => {
     if (seekTimeoutRef.current) {
@@ -88,8 +149,15 @@ const useMusicPlayer = ({
     if (user?.isHost && user_id === user?.userId) return;
     if (videoId !== currentSong?.music_url) return;
 
+    // A seek keeps the previous play/pause state
+    lastSyncRef.current = {
+      timestamp,
+      action:
+        action === 'seek' ? (lastSyncRef.current?.action ?? 'play') : action,
+    };
+
     if (!user?.isHost && !isPlayerEnabled) {
-      pendingSyncRef.current = { timestamp, action };
+      pendingSyncRef.current = lastSyncRef.current;
       return;
     }
 
@@ -227,6 +295,8 @@ const useMusicPlayer = ({
     const startTimestamp = pending?.timestamp;
 
     setIsPlayerEnabled(true);
+    // The click is a user gesture, so play with sound as before
+    setHasUnmuted(true);
     setIsPlaying(startPlaying);
 
     if (startTimestamp !== undefined) {
@@ -256,6 +326,7 @@ const useMusicPlayer = ({
 
   const handleReady = () => {
     isPlayerReadyRef.current = true;
+    setReadySongUrl(currentSong?.music_url);
     setIsReady(true);
     const pending = pendingSyncRef.current;
     if (
@@ -274,6 +345,19 @@ const useMusicPlayer = ({
 
   const handleError = () => {
     setIsPlaying(false);
+    fallbackToPendingSync('player error');
+  };
+
+  const handlePlaybackStart = () => {
+    isActuallyPlayingRef.current = true;
+  };
+
+  const handlePlaybackPause = () => {
+    isActuallyPlayingRef.current = false;
+    // Browsers may pause muted autoplay on their own (e.g. power saving)
+    if (isMuted && isPlaying) {
+      fallbackToPendingSync('paused by browser');
+    }
   };
 
   const handleDuration = (d: number) => {
@@ -302,6 +386,8 @@ const useMusicPlayer = ({
     handleUnmute,
     handleReady,
     handleError,
+    handlePlaybackStart,
+    handlePlaybackPause,
     handleEnded,
     handleDuration,
     handleProgress,
