@@ -166,7 +166,7 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                 # [ADD] 3. Late Join Sync Request Handling
                 # ==========================================================
                 if message_type == "request_sync":
-                    current_state = manager.room_state.get(room_id)
+                    current_state = manager.get_room_state(room_id)
 
                     if current_state:
                         await websocket.send_json(current_state)
