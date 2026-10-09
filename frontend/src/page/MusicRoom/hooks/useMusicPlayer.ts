@@ -1,17 +1,18 @@
 import useJumpSong from '@/hooks/mutations/useJumpSong';
 import usePlayNextSong from '@/hooks/mutations/usePlayNextSong';
 import usePlayPrevSong from '@/hooks/mutations/usePlayPrevSong';
-import type { ChatMessageResponse } from '@/schemas/chatSchema';
+import type { SubscribeSocket } from '@/hooks/useWebSocket';
 import type { QueueResponse } from '@/schemas/queueSchema';
+import type { SyncSocketMessage } from '@/schemas/socketSchema';
 import type { UserData } from '@/types/user';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type ReactPlayer from 'react-player';
 import type { OnProgressProps } from 'react-player/base';
 
 interface UseMusicPlayerProps {
   roomCode: string;
   sendMessage: (messageData: object) => void;
-  newMessage?: ChatMessageResponse;
+  subscribe: SubscribeSocket;
   user: UserData | null;
   currentSong: QueueResponse | undefined;
   onSongEnded?: () => void;
@@ -20,14 +21,14 @@ interface UseMusicPlayerProps {
 const useMusicPlayer = ({
   roomCode,
   sendMessage,
-  newMessage,
+  subscribe,
   user,
   currentSong,
   onSongEnded,
 }: UseMusicPlayerProps) => {
   const playerRef = useRef<ReactPlayer>(null);
   const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingSyncRef = useRef<{ timestamp: number; action: string } | null>(
+  const pendingSyncRef = useRef<{ timestamp?: number; action: string } | null>(
     null,
   );
 
@@ -47,10 +48,15 @@ const useMusicPlayer = ({
     });
   }, [currentSong]);
 
-  useEffect(() => {
-    if (newMessage?.type !== 'sync') return;
+  const clearPendingSeek = () => {
+    if (seekTimeoutRef.current) {
+      clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = null;
+    }
+  };
 
-    const { action, timestamp, videoId, user_id } = newMessage as any;
+  const handleSyncMessage = useEffectEvent((message: SyncSocketMessage) => {
+    const { action, timestamp, videoId, user_id } = message;
 
     if (user?.isHost && user_id === user?.userId) return;
     if (videoId !== currentSong?.music_url) return;
@@ -61,52 +67,49 @@ const useMusicPlayer = ({
     }
 
     const currentPlayerTime = playerRef.current?.getCurrentTime() || 0;
-    queueMicrotask(() => {
-      if (action === 'play') {
-        setIsPlaying(true);
 
-        if (
-          timestamp !== undefined &&
-          Math.abs(currentPlayerTime - timestamp) >= 2
-        ) {
-          playerRef.current?.seekTo(timestamp, 'seconds');
-          if (duration > 0) setPlayed(timestamp / duration);
-        }
-      } else if (action === 'pause') {
-        setIsPlaying(false);
+    if (action === 'play') {
+      clearPendingSeek();
+      setIsPlaying(true);
 
+      if (
+        timestamp !== undefined &&
+        Math.abs(currentPlayerTime - timestamp) >= 2
+      ) {
+        playerRef.current?.seekTo(timestamp, 'seconds');
+        if (duration > 0) setPlayed(timestamp / duration);
+      }
+    } else if (action === 'pause') {
+      clearPendingSeek();
+      setIsPlaying(false);
+
+      if (timestamp !== undefined) {
+        playerRef.current?.seekTo(timestamp, 'seconds');
+        if (duration > 0) setPlayed(timestamp / duration);
+      }
+    } else if (action === 'seek') {
+      // Debounce seek operations to prevent jitter
+      clearPendingSeek();
+
+      seekTimeoutRef.current = setTimeout(() => {
         if (timestamp !== undefined) {
           playerRef.current?.seekTo(timestamp, 'seconds');
           if (duration > 0) setPlayed(timestamp / duration);
         }
-      } else if (action === 'seek') {
-        // Debounce seek operations to prevent jitter
-        if (seekTimeoutRef.current) {
-          clearTimeout(seekTimeoutRef.current);
-        }
+      }, 100);
+    }
+  });
 
-        seekTimeoutRef.current = setTimeout(() => {
-          if (timestamp !== undefined) {
-            playerRef.current?.seekTo(timestamp, 'seconds');
-            if (duration > 0) setPlayed(timestamp / duration);
-          }
-        }, 100);
-      }
+  useEffect(() => {
+    const unsubscribe = subscribe('sync', (message) => {
+      handleSyncMessage(message);
     });
 
     return () => {
-      if (seekTimeoutRef.current) {
-        clearTimeout(seekTimeoutRef.current);
-      }
+      unsubscribe();
+      clearPendingSeek();
     };
-  }, [
-    newMessage,
-    user?.userId,
-    user?.isHost,
-    currentSong?.music_url,
-    duration,
-    isPlayerEnabled,
-  ]);
+  }, [subscribe]);
 
   const handlePlayNext = () => {
     if (user?.isHost && currentSong) {
@@ -203,9 +206,12 @@ const useMusicPlayer = ({
 
   const handleReady = () => {
     setIsReady(true);
-    if (pendingSyncRef.current?.action === 'seek_on_ready') {
-      const ts = pendingSyncRef.current.timestamp;
-      playerRef.current?.seekTo(ts, 'seconds');
+    const pending = pendingSyncRef.current;
+    if (
+      pending?.action === 'seek_on_ready' &&
+      pending.timestamp !== undefined
+    ) {
+      playerRef.current?.seekTo(pending.timestamp, 'seconds');
       pendingSyncRef.current = null;
     }
   };
