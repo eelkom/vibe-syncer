@@ -13,6 +13,7 @@ from app.utils import search_youtube_video, executor
 
 # [Fix] Configure Logger
 logger = logging.getLogger(__name__)
+AI_MODEL = 'gemini-3.8-flash'
 
 load_dotenv()
 
@@ -125,7 +126,7 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
         # [Prompt Instructions]
         prompt = f"""
         [Role]
-        You are 'VibeBot', a smart AI DJ with access to Google Search.
+        You are 'VibeBot', a helpful AI DJ.
 
         [Current Context]
         - **System Date**: {now}
@@ -140,7 +141,7 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
         [INSTRUCTIONS]
         1. **Intent Analysis**: Determine if the user wants a music recommendation or just chatting.
         2. **Music Recommendation Mode**:
-           - Use Google Search to find the PERFECT song (latest hits or classics).
+           - Recommend a real song that fits the user's request and current queue.
            - **CRITICAL RULE**: Do NOT generate the YouTube link yourself. You are not good at it.
            - Instead, output a special tag: `[[SONG: Artist Name - Song Title]]`.
            - The system will automatically replace this tag with the real valid link.
@@ -169,14 +170,13 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
 
         # 1. Generate AI response (including tags)
         response = await client.aio.models.generate_content(
-            model='gemini-2.0-flash',
+            model=AI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.7,
                 top_p=0.95,
                 top_k=40,
                 max_output_tokens=600,
-                tools=[types.Tool(google_search=types.GoogleSearch())]
             )
         )
 
@@ -236,7 +236,7 @@ async def get_ai_welcome_message(username: str) -> str:
 
     try:
         response = await client.aio.models.generate_content(
-            model='gemini-2.0-flash',
+            model=AI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.8,
