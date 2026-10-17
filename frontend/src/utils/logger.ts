@@ -16,4 +16,10 @@ export const logger = {
       console.warn(...args);
     }
   },
+
+  debug: (...args: unknown[]) => {
+    if (import.meta.env.DEV) {
+      console.debug(...args);
+    }
+  },
 };
