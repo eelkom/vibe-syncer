@@ -13,6 +13,9 @@ import type { OnProgressProps } from 'react-player/base';
 // Muted autoplay counts as failed if playback hasn't started within this time
 const AUTOPLAY_TIMEOUT_MS = 2000;
 
+// A sync for a song that isn't current yet is dropped after this time
+const EARLY_SYNC_MAX_AGE_MS = 10000;
+
 type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
 
 interface PendingSync {
@@ -57,6 +60,12 @@ const useMusicPlayer = ({
   const pendingSyncRef = useRef<PendingSync | null>(null);
   // Latest host state for the current song, used when falling back
   const lastSyncRef = useRef<PendingSync | null>(null);
+  // Sync received before its song became current (e.g. the initial sync
+  // arriving before the queue loads), applied once the song matches
+  const earlySyncRef = useRef<{
+    message: SyncSocketMessage;
+    receivedAt: number;
+  } | null>(null);
   // Ready state of the currently mounted player (it remounts on every song)
   const isPlayerReadyRef = useRef(false);
   const isActuallyPlayingRef = useRef(false);
@@ -91,9 +100,11 @@ const useMusicPlayer = ({
 
   useEffect(() => {
     queueMicrotask(() => {
+      // Guests that already have the host state for this song follow it
+      if (!user?.isHost && lastSyncRef.current) return;
       setIsPlaying(true);
     });
-  }, [currentSong]);
+  }, [currentSong, user?.isHost]);
 
   useEffect(() => {
     isPlayerReadyRef.current = false;
@@ -147,7 +158,12 @@ const useMusicPlayer = ({
     const { action, timestamp, videoId, user_id } = message;
 
     if (user?.isHost && user_id === user?.userId) return;
-    if (videoId !== currentSong?.music_url) return;
+    if (videoId !== currentSong?.music_url) {
+      if (!user?.isHost && videoId) {
+        earlySyncRef.current = { message, receivedAt: performance.now() };
+      }
+      return;
+    }
 
     // A seek keeps the previous play/pause state
     lastSyncRef.current = {
@@ -215,6 +231,29 @@ const useMusicPlayer = ({
       clearPendingSeek();
     };
   }, [subscribe]);
+
+  const applyEarlySync = useEffectEvent(() => {
+    const early = earlySyncRef.current;
+    if (!early || early.message.videoId !== currentSong?.music_url) return;
+
+    earlySyncRef.current = null;
+    const age = performance.now() - early.receivedAt;
+    if (age > EARLY_SYNC_MAX_AGE_MS) return;
+
+    const { action, timestamp } = early.message;
+    logger.log(`[Player] Applying sync received ${Math.round(age)}ms early`);
+    handleSyncMessage({
+      ...early.message,
+      timestamp:
+        action === 'play' && timestamp !== undefined
+          ? timestamp + age / 1000
+          : timestamp,
+    });
+  });
+
+  useEffect(() => {
+    applyEarlySync();
+  }, [currentSong?.music_url]);
 
   const handlePlayNext = () => {
     if (user?.isHost && currentSong) {
