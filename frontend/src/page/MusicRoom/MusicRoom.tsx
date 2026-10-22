@@ -74,6 +74,8 @@ const MusicRoom = () => {
     handleUnmute,
     handleReady,
     handleError,
+    handlePlaybackStart,
+    handlePlaybackPause,
     handleEnded,
     handleDuration,
     handleProgress,
@@ -144,6 +146,9 @@ const MusicRoom = () => {
                 width="100%"
                 height="100%"
                 onReady={handleReady}
+                onPlay={handlePlaybackStart}
+                onBuffer={handlePlaybackStart}
+                onPause={handlePlaybackPause}
                 onDuration={handleDuration}
                 onProgress={handleProgress}
                 onEnded={async () => {
