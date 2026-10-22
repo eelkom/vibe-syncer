@@ -1,6 +1,5 @@
 import Button from '@/components/ui/Button';
 import Error from '@/components/ui/Error';
-import Loading from '@/components/ui/Loading';
 import useDeleteRoom from '@/hooks/mutations/useDeleteRoom';
 import { ROUTE_PATH } from '@/routes/routePath';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -54,20 +53,8 @@ const DeleteRoomModal = ({ open, onOpenChange }: DeleteRoomModalProps) => {
                 </Button>
               </Dialog.Close>
 
-              <Button
-                variant="primary"
-                type="submit"
-                disabled={isPending}
-                className="relative"
-              >
-                {isPending && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loading size={64} />
-                  </div>
-                )}
-                <span className={isPending ? 'opacity-0' : 'opacity-100'}>
-                  Delete Room
-                </span>
+              <Button variant="primary" type="submit" loading={isPending}>
+                Delete Room
               </Button>
             </div>
           </form>

@@ -1,5 +1,4 @@
 import Button from '@/components/ui/Button';
-import Loading from '@/components/ui/Loading';
 import useCreateRoom from '@/hooks/mutations/useCreateRoom';
 import { ROUTE_PATH } from '@/routes/routePath';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -103,20 +102,8 @@ const CreateRoomModal = ({ open, onOpenChange }: CreateRoomModalProps) => {
                 </Button>
               </Dialog.Close>
 
-              <Button
-                variant="primary"
-                type="submit"
-                disabled={isPending}
-                className="relative"
-              >
-                {isPending && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loading size={64} />
-                  </div>
-                )}
-                <span className={isPending ? 'opacity-0' : 'opacity-100'}>
-                  Create Room
-                </span>
+              <Button variant="primary" type="submit" loading={isPending}>
+                Create Room
               </Button>
             </div>
           </form>

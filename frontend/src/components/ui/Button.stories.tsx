@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import Button from './Button';
 
 const meta: Meta<typeof Button> = {
@@ -8,7 +8,7 @@ const meta: Meta<typeof Button> = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['primary', 'secondary', 'danger'],
+      options: ['primary', 'secondary', 'success'],
     },
   },
 };
@@ -19,20 +19,36 @@ type Story = StoryObj<typeof Button>;
 export const Primary: Story = {
   args: {
     variant: 'primary',
-    children: 'Play Music',
+    children: 'Create Room',
   },
 };
 
 export const Secondary: Story = {
   args: {
     variant: 'secondary',
-    children: 'pause',
+    children: 'Cancel',
   },
 };
 
-export const Danger: Story = {
+export const Success: Story = {
   args: {
-    variant: 'tertiary',
-    children: 'Delete Room',
+    variant: 'success',
+    children: 'Refresh',
+  },
+};
+
+export const Loading: Story = {
+  args: {
+    variant: 'primary',
+    loading: true,
+    children: 'Create Room',
+  },
+};
+
+export const Disabled: Story = {
+  args: {
+    variant: 'primary',
+    disabled: true,
+    children: 'Create Room',
   },
 };

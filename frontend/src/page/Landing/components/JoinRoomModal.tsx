@@ -1,5 +1,4 @@
 import Button from '@/components/ui/Button';
-import Loading from '@/components/ui/Loading';
 import useJoinRoom from '@/hooks/mutations/useJoinRoom';
 import { ROUTE_PATH } from '@/routes/routePath';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -102,20 +101,8 @@ const JoinRoomModal = ({ open, onOpenChange }: JoinRoomModalProps) => {
                 </Button>
               </Dialog.Close>
 
-              <Button
-                variant="primary"
-                type="submit"
-                disabled={isPending}
-                className="relative"
-              >
-                {isPending && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loading size={64} />
-                  </div>
-                )}
-                <span className={isPending ? 'opacity-0' : 'opacity-100'}>
-                  Join Room
-                </span>
+              <Button variant="primary" type="submit" loading={isPending}>
+                Join Room
               </Button>
             </div>
           </form>

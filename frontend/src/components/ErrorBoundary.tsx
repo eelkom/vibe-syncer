@@ -27,7 +27,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             Please try refreshing the page or go back to the home screen.
           </p>
           <div className="flex gap-2">
-            <Button variant="tertiary" onClick={() => window.location.reload()}>
+            <Button variant="success" onClick={() => window.location.reload()}>
               Refresh
             </Button>
           </div>
