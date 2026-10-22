@@ -1,7 +1,7 @@
 import Error from '@/components/ui/Error';
 import Loading from '@/components/ui/Loading';
 import useChatMessages from '@/hooks/queries/useChatMessages';
-import type { ChatMessageResponse } from '@/schemas/chatSchema';
+import type { SubscribeSocket } from '@/hooks/useWebSocket';
 import type { UserData } from '@/types/user';
 import { getMessageId } from '@/utils/getMessageId';
 import { Bot, Send } from 'lucide-react';
@@ -11,33 +11,32 @@ interface ChatBoardProps {
   currentUser: UserData | null;
   roomCode: string;
   sendMessage: (messageData: object) => void;
-  newMessage: ChatMessageResponse | undefined;
+  subscribe: SubscribeSocket;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
-  isAiLoading: boolean;
 }
 
 const ChatBoard = ({
   currentUser,
   roomCode,
   sendMessage,
-  newMessage,
+  subscribe,
   connectionStatus,
-  isAiLoading,
 }: ChatBoardProps) => {
   const userId = currentUser?.userId;
   const { data: chatMessages, isLoading, isError } = useChatMessages(roomCode);
   const {
     chatContainerRef,
     newTextInput,
+    isAiLoading,
     handleSendMessage,
     handleAiAsk,
     handleInputChange,
   } = useChatBoard({
     sendMessage,
-    newMessage,
+    subscribe,
+    chatMessages,
     roomCode,
     connectionStatus,
-    isAiLoading,
   });
 
   if (isError) return <Error />;

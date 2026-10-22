@@ -1,7 +1,7 @@
 import { fetchChatMessagesAPI } from '@/api/chatApi';
 import {
   ChatMessageResponseSchema,
-  type ChatMessageResponse,
+  type ChatMessage,
 } from '@/schemas/chatSchema';
 import { getMessageId } from '@/utils/getMessageId';
 import { useQuery } from '@tanstack/react-query';
@@ -16,7 +16,7 @@ const useChatMessages = (roomCode: string) => {
       const rawData = await fetchChatMessagesAPI(roomCode);
       const validatedData = ChatMessagesArraySchema.parse(rawData);
 
-      const messageMap = new Map<string, ChatMessageResponse>();
+      const messageMap = new Map<string, ChatMessage>();
       validatedData.forEach((msg) => {
         messageMap.set(getMessageId(msg), msg);
       });
