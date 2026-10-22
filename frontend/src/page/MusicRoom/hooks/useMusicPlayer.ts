@@ -100,9 +100,11 @@ const useMusicPlayer = ({
 
   useEffect(() => {
     queueMicrotask(() => {
+      // Guests that already have the host state for this song follow it
+      if (!user?.isHost && lastSyncRef.current) return;
       setIsPlaying(true);
     });
-  }, [currentSong]);
+  }, [currentSong, user?.isHost]);
 
   useEffect(() => {
     isPlayerReadyRef.current = false;
