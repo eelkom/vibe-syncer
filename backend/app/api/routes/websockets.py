@@ -116,13 +116,16 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
             )
             db.add(ai_chat_entry)
             db.commit()
+            db.refresh(ai_chat_entry)
 
             await manager.broadcast_to_room(room_id, {
                 "type": "chat",
+                "id": ai_chat_entry.id,
+                "room_id": room_id,
                 "user_id": BOT_USER_ID,
                 "username": "🤖 VibeBot",
                 "message": welcome_msg,
-                "created_at": datetime.now().isoformat()
+                "created_at": ai_chat_entry.created_at.isoformat()
             })
 
             logger.info(f"AI Welcome message sent to {username} in room {room_id}")
@@ -192,6 +195,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                 # Broadcast Chat
                 await manager.broadcast_to_room(room_id, {
                     "type": "chat",
+                    "id": new_chat.id,
+                    "room_id": room_id,
                     "user_id": user_id,
                     "username": username,
                     "message": chat_message,
@@ -250,14 +255,17 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                         )
                         db.add(ai_chat_entry)
                         db.commit()
+                        db.refresh(ai_chat_entry)
 
                         # Broadcast AI Response
                         await manager.broadcast_to_room(room_id, {
                             "type": "chat",
+                            "id": ai_chat_entry.id,
+                            "room_id": room_id,
                             "user_id": BOT_USER_ID,
                             "username": "🤖 VibeBot",
                             "message": ai_reply,
-                            "created_at": datetime.now().isoformat()
+                            "created_at": ai_chat_entry.created_at.isoformat()
                         })
 
                 # URL Detection & Auto-Add to Queue
