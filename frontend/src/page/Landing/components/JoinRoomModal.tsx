@@ -1,7 +1,7 @@
+import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import useJoinRoom from '@/hooks/mutations/useJoinRoom';
 import { ROUTE_PATH } from '@/routes/routePath';
-import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { generatePath, useNavigate } from 'react-router-dom';
 
@@ -32,83 +32,77 @@ const JoinRoomModal = ({ open, onOpenChange }: JoinRoomModalProps) => {
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+    <Modal open={open} onOpenChange={onOpenChange}>
+      <Modal.Title className="mb-6 text-2xl font-bold text-gray-900">
+        Join Room
+      </Modal.Title>
 
-        <Dialog.Content className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-2xl bg-white p-8 shadow-2xl focus:outline-none">
-          <Dialog.Title className="mb-6 text-2xl font-bold text-gray-900">
+      <Modal.Description className="sr-only">
+        Enter the room code to join an existing music room.
+      </Modal.Description>
+
+      <form onSubmit={handleJoinRoom} className="relative">
+        {isError && (
+          <div className="mb-4 text-sm text-red-600">
+            Failed to join room. Please check the code and try again.
+          </div>
+        )}
+        <div className="mb-6">
+          <label
+            htmlFor="roomCode"
+            className="mb-2 block text-sm font-medium text-gray-700"
+          >
+            Room Code
+          </label>
+          <input
+            type="text"
+            id="roomCode"
+            value={roomCode}
+            onChange={(e) => setRoomCode(e.target.value)}
+            placeholder="Enter room code..."
+            className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            required
+            disabled={isPending}
+          />
+        </div>
+
+        <div className="mb-6">
+          <label
+            htmlFor="nickName"
+            className="mb-2 block text-sm font-medium text-gray-700"
+          >
+            Nick Name
+          </label>
+          <input
+            type="text"
+            id="nickName"
+            value={nickName}
+            onChange={(e) => setNickName(e.target.value)}
+            placeholder="Enter nickname..."
+            className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            required
+            disabled={isPending}
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <Modal.Close asChild>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => setRoomCode('')}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+          </Modal.Close>
+
+          <Button variant="primary" type="submit" loading={isPending}>
             Join Room
-          </Dialog.Title>
-
-          <Dialog.Description className="sr-only">
-            Enter the room code to join an existing music room.
-          </Dialog.Description>
-
-          <form onSubmit={handleJoinRoom} className="relative">
-            {isError && (
-              <div className="mb-4 text-sm text-red-600">
-                Failed to join room. Please check the code and try again.
-              </div>
-            )}
-            <div className="mb-6">
-              <label
-                htmlFor="roomCode"
-                className="mb-2 block text-sm font-medium text-gray-700"
-              >
-                Room Code
-              </label>
-              <input
-                type="text"
-                id="roomCode"
-                value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value)}
-                placeholder="Enter room code..."
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-                disabled={isPending}
-              />
-            </div>
-
-            <div className="mb-6">
-              <label
-                htmlFor="nickName"
-                className="mb-2 block text-sm font-medium text-gray-700"
-              >
-                Nick Name
-              </label>
-              <input
-                type="text"
-                id="nickName"
-                value={nickName}
-                onChange={(e) => setNickName(e.target.value)}
-                placeholder="Enter nickname..."
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-                disabled={isPending}
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <Dialog.Close asChild>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setRoomCode('')}
-                  disabled={isPending}
-                >
-                  Cancel
-                </Button>
-              </Dialog.Close>
-
-              <Button variant="primary" type="submit" loading={isPending}>
-                Join Room
-              </Button>
-            </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 
