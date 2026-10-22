@@ -1,26 +1,25 @@
 import { fetchChatMessagesAPI } from '@/api/chatApi';
-import {
-  ChatMessageResponseSchema,
-  type ChatMessage,
-} from '@/schemas/chatSchema';
-import { getMessageId } from '@/utils/getMessageId';
-import { useQuery } from '@tanstack/react-query';
+import { ChatMessageResponseSchema } from '@/schemas/chatSchema';
+import { mergeChatMessages, type ChatMessageMap } from '@/utils/chatMessages';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
 const ChatMessagesArraySchema = z.array(ChatMessageResponseSchema);
 
 const useChatMessages = (roomCode: string) => {
+  const queryClient = useQueryClient();
+  const queryKey = ['chatMessages', roomCode];
+
   return useQuery({
-    queryKey: ['chatMessages', roomCode],
+    queryKey,
     queryFn: async () => {
       const rawData = await fetchChatMessagesAPI(roomCode);
       const validatedData = ChatMessagesArraySchema.parse(rawData);
 
-      const messageMap = new Map<string, ChatMessage>();
-      validatedData.forEach((msg) => {
-        messageMap.set(getMessageId(msg), msg);
-      });
-      return messageMap;
+      // Read the cache after the request resolves so messages received over
+      // WebSocket in the meantime are merged instead of overwritten
+      const cached = queryClient.getQueryData<ChatMessageMap>(queryKey);
+      return mergeChatMessages(cached, validatedData);
     },
     enabled: !!roomCode,
     staleTime: 1000 * 10,

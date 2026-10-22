@@ -1,8 +1,10 @@
 import Error from '@/components/ui/Error';
 import Loading from '@/components/ui/Loading';
+import { BOT_USER_ID } from '@/constants/chat';
 import useChatMessages from '@/hooks/queries/useChatMessages';
 import type { SubscribeSocket } from '@/hooks/useWebSocket';
 import type { UserData } from '@/types/user';
+import { getDisplayMessage } from '@/utils/chatMessages';
 import { getMessageId } from '@/utils/getMessageId';
 import { Bot, Send } from 'lucide-react';
 import useChatBoard from '../hooks/useChatBoard';
@@ -84,7 +86,7 @@ const ChatBoard = ({
               >
                 <div
                   className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                    msg.user_id === 0
+                    msg.user_id === BOT_USER_ID
                       ? 'bg-black text-white'
                       : isMyMessage
                         ? 'bg-blue-500 text-white'
@@ -95,7 +97,7 @@ const ChatBoard = ({
                     <p className="mb-1 text-xs opacity-60">{msg.username}</p>
                   )}
                   <p className="whitespace-normal break-words text-sm">
-                    {msg.message}
+                    {getDisplayMessage(msg)}
                   </p>
                 </div>
               </div>
