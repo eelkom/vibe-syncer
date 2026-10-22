@@ -1,5 +1,6 @@
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
+import TextField from '@/components/ui/TextField';
 import useCreateRoom from '@/hooks/mutations/useCreateRoom';
 import { ROUTE_PATH } from '@/routes/routePath';
 import { useState } from 'react';
@@ -48,43 +49,27 @@ const CreateRoomModal = ({ open, onOpenChange }: CreateRoomModalProps) => {
             Failed to create room. Please try again.
           </div>
         )}
-        <div className="mb-6">
-          <label
-            htmlFor="roomName"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            Room Name
-          </label>
-          <input
-            type="text"
-            id="roomName"
-            value={roomName}
-            onChange={(e) => setRoomName(e.target.value)}
-            placeholder="Enter room name..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            required
-            disabled={isPending}
-          />
-        </div>
+        <TextField
+          id="roomName"
+          label="Room Name"
+          value={roomName}
+          onChange={(e) => setRoomName(e.target.value)}
+          placeholder="Enter room name..."
+          required
+          disabled={isPending}
+          className="mb-6"
+        />
 
-        <div className="mb-6">
-          <label
-            htmlFor="nickName"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            Nick Name
-          </label>
-          <input
-            type="text"
-            id="nickName"
-            value={hostNickName}
-            onChange={(e) => setHostNickName(e.target.value)}
-            placeholder="Enter nickname..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            required
-            disabled={isPending}
-          />
-        </div>
+        <TextField
+          id="nickName"
+          label="Nick Name"
+          value={hostNickName}
+          onChange={(e) => setHostNickName(e.target.value)}
+          placeholder="Enter nickname..."
+          required
+          disabled={isPending}
+          className="mb-6"
+        />
 
         <div className="flex gap-3">
           <Modal.Close asChild>

@@ -1,5 +1,6 @@
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
+import TextField from '@/components/ui/TextField';
 import useJoinRoom from '@/hooks/mutations/useJoinRoom';
 import { ROUTE_PATH } from '@/routes/routePath';
 import { useState } from 'react';
@@ -47,43 +48,27 @@ const JoinRoomModal = ({ open, onOpenChange }: JoinRoomModalProps) => {
             Failed to join room. Please check the code and try again.
           </div>
         )}
-        <div className="mb-6">
-          <label
-            htmlFor="roomCode"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            Room Code
-          </label>
-          <input
-            type="text"
-            id="roomCode"
-            value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value)}
-            placeholder="Enter room code..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            required
-            disabled={isPending}
-          />
-        </div>
+        <TextField
+          id="roomCode"
+          label="Room Code"
+          value={roomCode}
+          onChange={(e) => setRoomCode(e.target.value)}
+          placeholder="Enter room code..."
+          required
+          disabled={isPending}
+          className="mb-6"
+        />
 
-        <div className="mb-6">
-          <label
-            htmlFor="nickName"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            Nick Name
-          </label>
-          <input
-            type="text"
-            id="nickName"
-            value={nickName}
-            onChange={(e) => setNickName(e.target.value)}
-            placeholder="Enter nickname..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            required
-            disabled={isPending}
-          />
-        </div>
+        <TextField
+          id="nickName"
+          label="Nick Name"
+          value={nickName}
+          onChange={(e) => setNickName(e.target.value)}
+          placeholder="Enter nickname..."
+          required
+          disabled={isPending}
+          className="mb-6"
+        />
 
         <div className="flex gap-3">
           <Modal.Close asChild>
