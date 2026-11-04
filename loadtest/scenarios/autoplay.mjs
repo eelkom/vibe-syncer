@@ -1,6 +1,6 @@
 import { launch, tab, readyHost, enter, samples, scriptedUser } from '../lib/browser.mjs';
 import { sleep } from '../lib/common.mjs';
-import { firstPlayback, positionErrors, errorAt } from '../lib/stats.mjs';
+import { firstPlayback, positionErrors, errorAt, countUnexpectedPauses } from '../lib/stats.mjs';
 export async function run({ cleanup, result, seed, condition }) {
   const hb = await launch(cleanup), gb = await launch(cleanup, true);
   const host = await tab(hb, seed.host, result, cleanup);
@@ -26,10 +26,13 @@ export async function run({ cleanup, result, seed, condition }) {
     first_playback_ms: firstPlayback(within, guest.t0), audible_ms: audible,
     clicks: guest.clicks, err_after_audible_ms: audible === null ? null : errorAt(errors, guest.t0 + audible + 2000),
     failed: audible === null, reaction_time_ms: 1000,
+    host_unexpected_pauses: countUnexpectedPauses(hs, host.lastPlayClickAt),
+    guest_unexpected_pauses: countUnexpectedPauses(gs, guest.t0),
     blocked_play_calls: injection?.blocked ?? null,
     injection_effective: injection === null ? null
       : firstPlayback(gs.filter(s => injection.first_click === null || s.t < injection.first_click), guest.t0) === null,
     injection: condition === 'all-blocked' ? 'play・autoplay 차단 주입: userActivation 전 play 거부 및 자동재생 속성 무시 (저전력 모드 모사)' : null,
-    raw: { t0: guest.t0, host_samples: hs, guest_samples: gs, errors, guest_console: guest.consoleErrors, host_sent: host.sent },
+    raw: { t0: guest.t0, host_samples: hs, guest_samples: gs, errors, guest_console: guest.consoleErrors, host_sent: host.sent,
+      host_last_play_click_at: host.lastPlayClickAt },
   };
 }

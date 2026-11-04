@@ -15,6 +15,7 @@ export async function environment(argv) {
     cpu_model: os.cpus()[0]?.model ?? null, cpu_cores: os.cpus().length,
     memory_bytes: os.totalmem(), os: { platform: os.platform(), release: os.release(), arch: os.arch() },
     postgres: (await adminQuery('SELECT version()')).rows[0].version,
+    postgres_timezone: (await adminQuery('SHOW timezone')).rows[0].TimeZone,
     git_reference_commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim(),
     comparison_main: execFileSync('git', ['rev-parse', 'b86324b'], { cwd: REPO, encoding: 'utf8' }).trim(),
     argv, load_average_start: os.loadavg(), python_freeze: await readFile(path.join(ROOT, '.logs/python-freeze.txt'), 'utf8'),

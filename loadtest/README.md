@@ -6,6 +6,7 @@
 
 - 저장소 루트에서 실행한다. Node 22 이상, npm, uv, Python 3.11, PostgreSQL 도구(`pg_config`, `initdb`, `pg_ctl`), `/opt/homebrew/bin/ffmpeg`(VP8/libvpx·Opus/libopus 지원)와 `/opt/homebrew/bin/ffprobe`, Chromium 실행 가능한 환경이 필요하다. ffmpeg가 없으면 명확한 오류로 중단한다.
 - DB는 **127.0.0.1:55432**, 사용자 `vibe`, 비밀번호 없음, `CREATEDB` 권한. 5432나 운영 DB는 사용하지 않는다. 실행기는 다른 DB 호스트·포트를 거부하고 `loadtest_*` DB만 만든다. 기존 동명 DB가 있으면 삭제하지 않고 실패한다.
+- 전용 DB 시간대는 운영과 같은 UTC로 고정한다. `+09:00` 응답은 프론트 `RoomInfosResponseSchema.created_at`의 `z.string().datetime()` 검증을 통과하지 못하므로, 클러스터 시작 옵션과 각 DB의 `ALTER DATABASE ... SET timezone TO 'UTC'`를 함께 적용한다.
 - 포트: API/WS `18000`, 프론트 `15173`, 음원 `15174`. 전부 127.0.0.1에만 바인딩한다. 같은 도구의 동시 실행은 `.logs/stage1.lock`으로 거부한다. 비정상 종료 후 잠금이 남으면 실행 중 프로세스가 없음을 확인한 다음 해당 잠금 파일만 제거한다.
 - 현재 환경에 이미 떠 있는 전용 DB와 `loadtest/.pg/`, `.pg.log`는 그대로 사용한다. **이 환경에서는 db.sh를 실행하지 않는다.** 아래 DB 명령은 다른 사람이 새 환경을 만들 때 사용한다.
 - Python 서버는 dotenv 로딩을 끄고 GEMINI/GOOGLE 키를 지우며 AI 환영 함수는 고정 문자열, DJ 함수는 예외로 치환한다. 치환 후 `app.main`을 import한다. 외부 소켓 연결도 거부한다. 미디어는 로컬 WebM 영상 파일이며 Gemini/YouTube API와 운영 서버를 사용하지 않는다.
@@ -35,7 +36,7 @@ loadtest/scripts/db.sh start
 loadtest/scripts/db.sh stop
 ```
 
-`db.sh`는 `LC_ALL=C`, `PGDATA=loadtest/.pg`, 포트 55432, listen 127.0.0.1, `max_connections=300`을 사용한다. `PGBIN`을 설정하면 PostgreSQL 실행 파일 디렉터리를 지정할 수 있다. 기존 PGDATA에서 initdb를 거부한다.
+`db.sh`는 `LC_ALL=C`, `PGDATA=loadtest/.pg`, 포트 55432, listen 127.0.0.1, `max_connections=300`, `timezone=UTC`를 사용한다. `PGBIN`을 설정하면 PostgreSQL 실행 파일 디렉터리를 지정할 수 있다. 기존 PGDATA에서 initdb를 거부한다.
 
 전체 비교 커밋 준비:
 
@@ -67,7 +68,7 @@ python3 -m py_compile loadtest/server/run_server.py
 bash -n loadtest/scripts/db.sh loadtest/scripts/prepare_commit.sh
 ```
 
-단위 테스트는 중앙값, nearest-rank p75/p95, 보간·paused 제외, 2초 연속 동기화, 1초 구간 최고치, 두 재연결 공식 범위, 정확한 마커 집계, summarize의 null 처리와 주입 무효 회차 집계를 검증한다.
+단위 테스트는 중앙값, nearest-rank p75/p95, 보간·paused 제외, 2초 연속 동기화, 1초 구간 최고치, 두 재연결 공식 범위, 정확한 마커 집계, 재생 시작 후 일시정지 전환, summarize의 null 처리·주입 무효 회차·호스트 멈춤 무효 회차 집계를 검증한다.
 
 봇만 스모크(브라우저를 실행하지 않음; `b86324b` 준비 필요):
 
@@ -128,7 +129,7 @@ node loadtest/summarize.mjs
 | 8003014, e7904b9, 32cdc26, 1b2e6c4, ea2acea | `button.animate-pulse` (needsSync) | 없음 | `button.h-14` |
 | e75a31c, 08eb0e5, a086001, b86324b | `button.animate-pulse` (needsSync) | 정확한 텍스트 `탭하여 소리 켜기` | `button.h-14` |
 
-예: `8003014`의 120-135행, `b86324b`의 131-146행은 동기화/중앙 버튼, `b86324b`의 160-166행은 소리 켜기 버튼이다. 없는 버튼을 대체하거나 앱을 패치하지 않는다. 채팅 입력 `input[placeholder="Message..."]`, 채팅 영역 `div.scrollbar-hide.overflow-y-auto` 및 로딩 중 직계 `div.h-full`은 모든 커밋의 `components/ChatBoard.tsx`에 공통이다.
+예: `8003014`의 120-135행, `b86324b`의 131-146행은 동기화/중앙 버튼, `b86324b`의 160-166행은 소리 켜기 버튼이다. 없는 버튼을 대체하거나 앱을 패치하지 않는다. 채팅 입력은 `input[placeholder="Message..."]`를 사용하며, 채팅 영역은 `div:has(> div > h2:text-is("Chat")) > div.scrollbar-hide.overflow-y-auto`로 Chat 제목이 있는 카드 안에서만 선택한다. `e7904b9`·`32cdc26`의 `components/ChatBoard.tsx:46-60`, `08eb0e5:45-59`, `b86324b:47-61` 모두 카드의 직계 헤더 div 안에 h2 Chat, 그 형제로 스크롤 div가 있는 동일 구조다. 대기열의 스크롤 영역은 선택하지 않는다. 로딩 중 직계 `div.h-full`은 기존과 같다.
 
 스크립트 사용자는 250ms마다 보이는 동기화/소리 켜기 버튼을 찾고 최초 확인 1000ms 후 실제 Playwright 클릭을 한다. 총 시도 상한은 5회이며 최초 확인·시도·실제 trusted click 시각과 성공 여부를 기록한다. **사용자 반응 시간 1000ms가 측정값에 포함된다.** 동기화 버튼을 우선하며 더 이상 보이지 않으면 예약을 취소한다.
 
@@ -138,11 +139,13 @@ node loadtest/summarize.mjs
 
 각 run은 시나리오·공식/프론트 커밋·서버 커밋·조건·회차·시작/종료 시각·원시 지표·차단 요청 수·오류 목록·`ok`를 가진다. `ok`는 스크립트가 끝까지 실행됐는지이며, autoplay의 `failed`나 null 동기화 결과와 별개다. 브라우저 실패 도중에도 가능한 샘플/프레임/콘솔은 cleanup 전에 `browser_artifacts`에 보존한다. 봇은 개별 시도/open/close 코드·지연·수신 건수를 남긴다.
 
-환경 JSON은 Node, Python, 실제 launch에서 얻은 Chromium 버전, CPU 모델·코어 수, 메모리, OS, 전용 Postgres 버전, git HEAD와 기준 main, 실행 인자, 시작 부하 평균, Python 의존성을 기록한다. 봇만 실행한 환경의 실제 Chromium 버전은 null이고 Playwright manifest의 예상 버전은 별도 필드다. 브라우저를 실행하지 않고 버전을 만들어 쓰지 않는다.
+환경 JSON은 Node, Python, 실제 launch에서 얻은 Chromium 버전, CPU 모델·코어 수, 메모리, OS, 전용 Postgres 버전과 `SHOW timezone` 값(`postgres_timezone`), git HEAD와 기준 main, 실행 인자, 시작 부하 평균, Python 의존성을 기록한다. 봇만 실행한 환경의 실제 Chromium 버전은 null이고 Playwright manifest의 예상 버전은 별도 필드다. 브라우저를 실행하지 않고 버전을 만들어 쓰지 않는다.
 
 브라우저 init script는 100ms마다 첫 `audio,video`의 `{t: Date.now(), ct, paused, muted, volume}` 또는 `{t, none:true}`를 수집한다. 게스트 샘플 시각에서 호스트 위치를 선형 보간해 절대 오차(ms)를 구한다. 게스트와 보간 양 끝의 호스트가 모두 재생 중이어야 유효하다. 외삽하지 않는다. 250ms를 넘는 관측 공백·paused·미디어 없음은 2초 연속 동기화 판정을 끊는다. `sync_time_ms`는 오차 500ms 미만이 2초 유지되는 구간의 시작 시각이다. 지정 시점 오차는 ±200ms 안의 가장 가까운 샘플이며 없으면 null이다.
 
-late_join의 마지막 10초 오차 p50/p75/p95는 유효 샘플에서 계산한다. autoplay는 재생 중인 샘플에서 ct가 0.2초 이상 증가한 첫 확인 시각을 사용하며 audible은 추가로 muted=false, volume>0이어야 한다. 모든 회차별 값은 그대로 저장하고 요약에서 회차 중앙값과 nearest-rank p75/p95를 구한다. 회차가 5개면 nearest-rank p95는 최댓값과 같다. null/미기록은 0으로 바꾸지 않으며 결측 회차 수를 표시한다. 실패한 회차도 집계에서 없애지 않는다.
+late_join의 마지막 10초 오차 p50/p75/p95는 유효 샘플에서 계산한다. autoplay는 재생 중인 샘플에서 ct가 0.2초 이상 증가한 첫 확인 시각을 사용하며 audible은 추가로 muted=false, volume>0이어야 한다. 모든 회차별 값은 그대로 저장하고 요약에서 회차 중앙값과 nearest-rank p75/p95를 구한다. 회차가 5개면 nearest-rank p95는 최댓값과 같다. null/미기록은 0으로 바꾸지 않으며 결측 회차 수를 표시한다. 실패한 회차도 원본과 회차 수에 남긴다.
+
+late_join과 autoplay는 `host_unexpected_pauses`, `guest_unexpected_pauses`를 기록한다. 호스트는 `readyHost`의 마지막 실제 재생 클릭 시각(`raw.host_last_play_click_at`) 이후 첫 `paused=false` 샘플부터 `false → true` 전환만 센다. 게스트도 첫 재생 샘플 이전의 초기 paused 상태는 세지 않는다. 미디어 요소가 없는 구간을 가로질러 전환을 추정하지 않는다. `host_unexpected_pauses > 0`인 회차는 모든 지표의 중앙값·p75·p95에서 제외하고 요약 표의 「호스트 멈춤 무효 회차」로 표시한다. 원본은 그대로 유지하며 삭제하거나 자동 재시도하지 않는다. 결측 회차는 이 제외 후의 회차에서 센다. 게스트 멈춤은 표시만 하며 집계 제외 사유가 아니다.
 
 ## 브라우저 스모크 확인 항목과 한계
 
@@ -151,5 +154,6 @@ late_join의 마지막 10초 오차 p50/p75/p95는 유효 샘플에서 계산한
 - history_race 원본의 A 수신 → 응답 보류 → B 수신 → 전달 순서와 스냅샷을 확인한다. 순서를 충족하지 못하면 결과를 정상 측정으로 해석하지 않는다.
 - 브라우저 SIGTRAP 제약 때문에 이 샌드박스에서는 브라우저 시나리오를 실행하지 않았다. Claude가 샌드박스 밖에서 스모크 로그를 검토해야 한다.
 - 봇은 한 Node 프로세스의 이벤트 루프·네트워크·CPU 스케줄링 한계가 포함된다. 실제 사용자 200명의 브라우저 부하를 재현하지 않는다. 소수 실제 브라우저 검증은 공식 동작 확인용이다.
+- 모든 브라우저에 `--mute-audio`와 `--disable-features=HardwareMediaKeyHandling`을 고정 적용한다. `--mute-audio`는 출력만 끄며 측정에 쓰는 `el.muted`, `el.volume`은 앱이 정한 값 그대로다. 미디어 키 제어 비활성화는 원인이 확정되지 않은 호스트 멈춤을 방지하기 위한 설정이며, 멈춤 원인을 확정하는 근거는 아니다.
 - 로컬 영상 파일과 동일 머신 시계의 결과다. 실제 서비스 경로는 YouTube iframe이지만 시험은 로컬 영상 파일이므로 YouTube의 버퍼링과 `handleUnmute`의 YouTube 분기는 재지 않는다. 원격망/운영 부하, 실제 저전력 모드, 확성기에서 소리가 나는지는 재현하지 않는다. audible은 미디어 요소 상태를 기준으로 한다. 무음 허용 여부는 Chromium 정책에도 좌우된다.
 - 스모크 수치는 작은 크기의 도구 검증 결과이며 성능 결론에 사용하지 않는다. 로그·캐시·음원·아카이브·전용 DB 데이터는 git에서 제외한다.

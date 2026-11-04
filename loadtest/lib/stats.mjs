@@ -11,6 +11,17 @@ export function percentile(values, p = 0.95) {
   return a.length ? a[Math.ceil(a.length * p) - 1] : null;
 }
 const playing = s => s && !s.none && s.paused === false && Number.isFinite(s.ct);
+export function countUnexpectedPauses(samples, since = -Infinity) {
+  let previous = null, count = 0;
+  for (const s of samples) {
+    if (s.t < since) continue;
+    // Do not infer a false -> true transition across an absent media element.
+    if (s.none || typeof s.paused !== 'boolean') { previous = null; continue; }
+    if (previous === false && s.paused === true) count++;
+    previous = s.paused;
+  }
+  return count;
+}
 export function interpolate(samples, t) {
   let lo = 0, hi = samples.length - 1;
   while (lo <= hi) {

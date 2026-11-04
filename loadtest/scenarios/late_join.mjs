@@ -1,6 +1,6 @@
 import { launch, tab, readyHost, enter, samples, scriptedUser } from '../lib/browser.mjs';
 import { sleep } from '../lib/common.mjs';
-import { positionErrors, syncTime, errorAt, median, percentile } from '../lib/stats.mjs';
+import { positionErrors, syncTime, errorAt, median, percentile, countUnexpectedPauses } from '../lib/stats.mjs';
 export async function run(ctx) {
   const { cleanup, result, seed, smoke } = ctx;
   const hostBrowser = await launch(cleanup);
@@ -29,7 +29,10 @@ export async function run(ctx) {
     queue_response_ms: relative(guest.responses.find(r => /\/queue_list(?:\?|$)/.test(r.url))),
     ws_reconnects: Math.max(0, guest.attempts.length - 1),
     guest_console_errors: guest.consoleErrors.length,
+    host_unexpected_pauses: countUnexpectedPauses(hs, host.lastPlayClickAt),
+    guest_unexpected_pauses: countUnexpectedPauses(gs, guest.t0),
     raw: { t0: guest.t0, host_samples: hs, guest_samples: gs, errors, guest_frames: guest.frames,
+      host_last_play_click_at: host.lastPlayClickAt,
       guest_console: guest.consoleErrors, host_sent: host.sent, ws_attempts: guest.attempts },
   };
 }

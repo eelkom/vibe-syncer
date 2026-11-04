@@ -8,12 +8,19 @@ const { chromium } = await import('playwright');
 export const browserVersions = new Set();
 export const selectors = {
   play: 'button.h-14', sync: 'button.animate-pulse',
-  input: 'input[placeholder="Message..."]', chat: 'div.scrollbar-hide.overflow-y-auto',
+  // frontend/src/page/MusicRoom/components/ChatBoard.tsx: all four versions
+  // have a card > header div > h2 "Chat", then a direct scroll div sibling.
+  // e7904b9/32cdc26:46-60; 08eb0e5:45-59; b86324b:47-61.
+  // Scope to that card so QueueBoard's matching scroll classes are excluded.
+  input: 'input[placeholder="Message..."]',
+  chat: 'div:has(> div > h2:text-is("Chat")) > div.scrollbar-hide.overflow-y-auto',
 };
 export async function launch(cleanup, activation = false) {
   const browser = await chromium.launch({ headless: true, args: [
     `--autoplay-policy=${activation ? 'document-user-activation-required' : 'no-user-gesture-required'}`,
     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
+    '--mute-audio',
+    '--disable-features=HardwareMediaKeyHandling',
   ] });
   browserVersions.add(browser.version());
   cleanup.push(() => browser.close());
@@ -28,12 +35,14 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
     sessionStorage.setItem('user', JSON.stringify(user));
     window.__samples = [];
     window.__userClickEvents = [];
+    window.__lastPlaybackClickAt = null;
     window.__blockedPlay = 0;
     document.addEventListener('click', event => {
       const button = event.target instanceof Element ? event.target.closest('button') : null;
       const kind = button?.classList.contains('animate-pulse') ? 'sync'
         : button?.textContent?.trim() === '탭하여 소리 켜기' ? 'unmute' : null;
       if (kind && event.isTrusted) window.__userClickEvents.push({ kind, t: Date.now() });
+      if (button?.classList.contains('h-14') && event.isTrusted) window.__lastPlaybackClickAt = Date.now();
     }, true);
     setInterval(() => {
       const el = document.querySelector('audio,video');
@@ -151,6 +160,7 @@ export async function readyHost(state, room) {
   await until(() => state.sent.some(f => f.t >= since && f.data.type === 'sync' && f.data.action === 'pause'), 5000, 'host pause sync frame');
   await sleep(300);
   await state.page.locator(selectors.play).click();
+  state.lastPlayClickAt = await state.page.evaluate(() => window.__lastPlaybackClickAt);
   await until(() => state.sent.some(f => f.t >= since && f.data.type === 'sync' && f.data.action === 'play'), 5000, 'host play sync frame');
 }
 export async function chatReady(state) {

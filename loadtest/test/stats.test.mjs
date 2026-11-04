@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { median, percentile, interpolate, positionErrors, syncTime, peakPerSecond, countMarkers, firstPlayback, stddev } from '../lib/stats.mjs';
+import { median, percentile, interpolate, positionErrors, syncTime, peakPerSecond, countMarkers, firstPlayback, stddev, countUnexpectedPauses } from '../lib/stats.mjs';
 import { MAX_ATTEMPTS, reconnectDelay } from '../lib/reconnect-policy.mjs';
 import { summarizeRuns, markdown } from '../summarize.mjs';
 import { parseArgs, plan } from '../lib/config.mjs';
@@ -47,6 +47,22 @@ test('sync does not bridge sampling gaps or a paused sample', () => {
   const a = Array.from({ length: 30 }, (_, i) => ({ t: i * 100, err: i === 15 ? null : 0 }));
   assert.equal(syncTime(a, 0), null);
 });
+test('pause counts start at the first playing sample after the final host play click', () => {
+  const samples = [sample(0, 1), sample(100, 1, true), sample(200, 1, true),
+    sample(300, 1.1), sample(400, 1.1, true), sample(500, 1.1, true),
+    sample(600, 1.2), sample(700, 1.2, true)];
+  assert.equal(countUnexpectedPauses(samples, 150), 2);
+  assert.equal(countUnexpectedPauses(samples.slice(0, 3), 150), 0);
+  assert.equal(countUnexpectedPauses(samples), 3);
+  assert.equal(countUnexpectedPauses([]), 0);
+});
+test('guest initial pause and absent media do not create pause transitions', () => {
+  const samples = [{ t: 0, none: true }, sample(100, 0, true), sample(200, 0.1),
+    sample(300, 0.1, true), { t: 400, none: true }, sample(500, 0, true),
+    sample(600, 0.1), { t: 700, none: true }, sample(800, 0.1, true)];
+  assert.equal(countUnexpectedPauses(samples), 1);
+  assert.equal(countUnexpectedPauses([sample(0, 0, true), sample(100, 0, true)]), 0);
+});
 test('one-second fixed bins include boundaries and exclude prior events', () => {
   assert.equal(peakPerSecond([999, 1000, 1999, 2000, 2001, 2999], 1000), 3);
   assert.equal(peakPerSecond([], 0), 0);
@@ -86,6 +102,30 @@ test('summarize counts explicit ineffective injections and retains null counters
   assert.deepEqual(group.metrics.blocked_play_calls, { median: 0, p75: 0, p95: 0, valid: 1, missing: 3 });
   assert.match(markdown([group]), /주입 무효 회차/);
   assert.match(markdown([group]), /autoplay\/abc\/all-blocked \| 4 \| 0 \| 0 \| 1/);
+});
+test('host pause invalidates numeric aggregates, preserves originals and counts separately from nulls', () => {
+  const runs = [
+    { sync_time_ms: 0, host_unexpected_pauses: 1 },
+    { sync_time_ms: 10, host_unexpected_pauses: 0, guest_unexpected_pauses: 3 },
+    { sync_time_ms: 20, host_unexpected_pauses: 0 },
+    { sync_time_ms: 1000, host_unexpected_pauses: 2 },
+    { sync_time_ms: null, host_unexpected_pauses: 0 },
+  ].map(metrics => ({ scenario: 'late_join', commit: 'abc', condition: 'default', ok: true, metrics }));
+  const original = structuredClone(runs);
+  const group = summarizeRuns(runs)[0];
+  assert.equal(group.runs, 5);
+  assert.equal(group.host_pause_invalid, 2);
+  assert.deepEqual(group.metrics.sync_time_ms, { median: 15, p75: 20, p95: 20, valid: 2, missing: 1 });
+  assert.equal(group.metrics.guest_unexpected_pauses.median, 3);
+  assert.deepEqual(runs, original);
+  assert.match(markdown([group]), /호스트 멈춤 무효 회차/);
+  assert.match(markdown([group]), /late_join\/abc\/default \| 5 \| 0 \| 0 \| 0 \| 2/);
+});
+test('all host-paused autoplay runs yield null aggregates without becoming missing runs', () => {
+  const group = summarizeRuns([{ scenario: 'autoplay', commit: 'abc', condition: 'all-blocked', ok: true,
+    metrics: { host_unexpected_pauses: 1, audible_ms: 100 } }])[0];
+  assert.equal(group.host_pause_invalid, 1);
+  assert.deepEqual(group.metrics.audible_ms, { median: null, p75: null, p95: null, valid: 0, missing: 0 });
 });
 test('playback/audible timestamps require .2s advancement and audible state', () => {
   const a = [sample(0, 5), sample(100, 5.1), sample(300, 5.3)];

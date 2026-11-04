@@ -12,6 +12,7 @@ export async function createDatabase(name) {
   valid(name);
   // Existing DB is an error; never delete another run's database on startup.
   await adminQuery(`CREATE DATABASE "${name}"`);
+  await adminQuery(`ALTER DATABASE "${name}" SET timezone TO 'UTC'`);
 }
 export async function dropDatabase(name) {
   valid(name);
