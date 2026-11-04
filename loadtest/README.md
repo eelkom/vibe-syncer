@@ -182,3 +182,58 @@ node loadtest/summarize.mjs
 - 모든 브라우저에 `--mute-audio`와 `--disable-features=HardwareMediaKeyHandling`을 고정 적용한다. `--mute-audio`는 출력만 끄며 측정에 쓰는 `el.muted`, `el.volume`은 앱이 정한 값 그대로다. 미디어 키 제어 비활성화는 원인이 확정되지 않은 호스트 멈춤을 방지하기 위한 설정이며, 멈춤 원인을 확정하는 근거는 아니다.
 - 로컬 영상 파일과 동일 머신 시계의 결과다. 실제 서비스 경로는 YouTube iframe이지만 시험은 로컬 영상 파일이므로 YouTube의 버퍼링과 `handleUnmute`의 YouTube 분기는 재지 않는다. 원격망/운영 부하, 실제 저전력 모드, 확성기에서 소리가 나는지는 재현하지 않는다. audible은 미디어 요소 상태를 기준으로 한다. 무음 허용 여부는 Chromium 정책에도 좌우된다.
 - 스모크 수치는 작은 크기의 도구 검증 결과이며 성능 결론에 사용하지 않는다. 로그·캐시·음원·아카이브·전용 DB 데이터는 git에서 제외한다.
+
+## 2단계: 한 방의 인원 증가 (#36)
+
+2단계는 `b86324b` 하나의 프론트 응답성과 재생 상태를 측정한다. 서버 지표는 원인을 설명하는 자료다. 1단계 시나리오·원본을 수정하지 않으며 새 러너와 `stage2/` 모듈을 사용한다. `--instrument`가 없는 서버 실행은 1단계와 동일하다.
+
+준비와 실행(저장소 루트):
+
+```bash
+npm ci --prefix loadtest
+loadtest/scripts/prepare_profiling.sh
+# Chromium 설치와 전용 DB 준비는 위 공통 절차 참조
+node loadtest/run_stage2.mjs --smoke
+# 스모크 검토 후 본 실행
+node loadtest/run_stage2.mjs
+node loadtest/summarize_stage2.mjs
+```
+
+`prepare_profiling.sh`는 일반 빌드와 프로파일링 빌드를 준비한다. 대상 커밋의 `vite.config.ts`를 그대로 로드하고 `react-dom/client`만 React DOM 19.2의 `react-dom/profiling`으로 alias한다. 이 버전의 profiling 번들은 일반 `scheduler`를 import하므로 scheduler alias가 필요하지 않다(로컬 `react-dom/cjs/react-dom-profiling.profiling.js` 근거). `frontend/dist-profiling`은 chat_accumulation에서만 사용한다. 앱 소스는 바꾸지 않는다.
+
+| 조건 | 서버 | 총 연결 N |
+|---|---|---|
+| default | 풀 수정 없음 | 2, 10, 14, 15, 16, 25 |
+| pool-250 | 측정용 풀 250, overflow 0 | 10, 25, 50, 100, 200 |
+
+N은 호스트·관찰자 각각 실제 브라우저 1개와 봇 N-2개의 합이다. join_burst만 실제 입장자 1개를 추가하고 봇은 N-3개다. default는 약 15연결의 실제 한계를, pool-250은 그 뒤의 병목을 찾는 진단 조건이다. 결과를 섞어서 원래 서버 수용량으로 해석하지 않는다. 회차 기본 3회, 조건별 N 오름차순이다. `--scenario steady|chat_burst|join_burst|chat_accumulation`과 `--runs`를 지원한다(chat_accumulation은 명세대로 고정 3회). pool-250의 같은 시나리오·조건에서 작은 N의 회차가 3개 모두 `setup_failed=true, ok=true`이면 더 큰 N은 서버를 실행하지 않고 `skipped` 원본을 남긴다. default는 건너뛰지 않는다.
+
+회차마다 새 DB·서버·브라우저·봇 자식 프로세스를 만든다. 보통 봇 입장은 50ms마다 시작하며 REST join 후 WS를 연다. 호스트·관찰자는 모두 `no-user-gesture-required`; 관찰자에만 `--enable-precise-memory-info`를 추가한다. 기존 scriptedUser가 관찰자의 소리 켜기를 한 번 클릭한 뒤 멈추며 실제 unmuted/playing 상태를 콘솔 계측으로 확인한다. 출력 음소거·외부 DNS 차단은 그대로다. 모든 봇의 입장 확인 상한은 60초다. 그때 미완료면 `setup_failed`와 연결 수를 저장하고 30초 더 관찰한다. 이는 서비스 실패이므로 `ok=true`이며 배치를 중단하지 않는다. 스크립트 오류만 `ok=false`다.
+
+- steady: 입장 후 10초 안정화, 60초 관찰. 측정 시작 15초에 호스트 UI 일시정지, 18초 재생, 33초 +20초 목표 seek, 48초 일시정지, 51초 재생. 전송 sync 프레임으로 확인하며 원본에 실제 timestamp를 남긴다. range 입력의 목표는 현재 위치+20초이고 실제 값은 포인터의 픽셀 해상도에 따른다. 봇은 합계 2개/초를 순서대로 보내며 N=2는 관찰자 키보드가 이를 대신한다. 관찰자는 별도로 5초마다 한 메시지를 입력한다.
+- chat_burst: 입장 후 5초 안정화, 30초 관찰. 각 봇이 매초의 임의 시점에 1개를 보내고 관찰자는 2초마다 입력한다. 관찰자 CPU 1배·4배를 `default`, `default-cpu4`, `pool-250`, `pool-250-cpu4`로 분리한다. 전송 종료 뒤 고정 30초까지 수신을 정리한다. 좋은 값에 따라 대기를 단축하지 않는다.
+- join_burst: 호스트·관찰자 입장 후 10초 안정화한다. 봇 N-3개는 3초에 균등하게 입장을 시작한다. 1.5초 시점에 입장자가 랜딩으로 이동해 Join Existing Room → 코드·닉네임 입력 → 제출을 실제 mouse/keyboard로 수행한다. 입장자 sessionStorage는 미리 넣지 않는다. 제출 클릭 직전부터 첫 재생 확인까지 join_ms를 계산하고 입장 후 30초 관찰한다. N<3은 계획에서 제외한다. 입장 완료 상한과 실패 추가 관찰은 공통 규칙과 같다.
+- chat_accumulation: default, N=3, 고정 3회이며 profiling 빌드다. 봇이 200개/초로 10,000개를 보내고 1,000/2,000/5,000/10,000개가 화면에 수신될 때마다 콘솔 체크포인트를 내보내 관찰자 키보드 입력 1건을 실행한다. 발신은 멈추지 않는다. 상한 300초, 수신한 만큼 기록한다. 체크포인트의 heap·DOM 노드 수와 앞 구간의 React commit·Long Task 등, 해당 입력 주변 Event Timing의 INP 후보 값을 기록한다.
+
+관찰 중 관찰자 페이지 평가를 하지 않는다. 입력 위치와 체크포인트, 접속 상태는 init script가 콘솔 텍스트로 전달한다. 입력은 page.mouse/page.keyboard만 사용하고 전체 데이터는 관찰 종료 후 읽는다. 미디어 샘플 100ms, heap·DOM 크기 1초, rAF 간격과 longtask PerformanceObserver, React DevTools hook, 버전 고정 `web-vitals@5.1.0` IIFE의 `onINP(reportAllChanges:true)`를 사용한다. INP는 매 회차 새 페이지에서 web-vitals가 보고한 마지막 값이며 초기 소리 켜기 입력도 페이지 수명에 포함된다. 입력 건수는 관찰 중 실제 Enter 이벤트다. 일반 빌드의 React 커밋 시간은 null, profiling은 root.current.actualDuration을 사용한다. heap 시작·끝은 1초 주기의 첫·마지막 유효 샘플이다.
+
+채팅 마커는 `c-<발신자>-<순번>-<ms>`다. 봇 시각은 send 직전, 키보드 메시지는 입력 요청 직전이므로 키보드 입력 처리 시간도 전달 지연에 포함된다. MutationObserver는 변경된 텍스트 노드만 살피고 최초 표시 시각을 저장한다. 마커별 최대 동시 표시 수의 초과분을 duplicates로 세며 DOM 노드 이동·재사용은 중복으로 세지 않는다. 미표시 마커는 lost, 첫 봇이 못 받은 마커는 server_side_lost이고 N=2는 null이다. 봇의 수신은 계속 소모하며 대조 봇만 문자열에서 마커를 찾고 모든 프레임을 JSON 파싱하지 않는다.
+
+오차는 1단계 positionErrors를 사용한다. steady의 첫 pause 이전은 join_err_p50/p75/p95, 그 뒤 첫 resume부터는 err_p50/p75/p95다(ms). 양쪽의 paused 샘플, 명시적 pause→play 구간, 명시적 seek 후 1.5초는 제외한다. 최신 수신 action이 play이고 1초 안에 발생한 seeking만 play_correction_seeks다. 첫 pause 이전(입장 시)의 seeking과 pause/seek 뒤의 seeking은 제외한다. dropped_frames는 `max(0, round(delta/16.67)-1)` 합, total_frames는 관찰 구간의 rAF 수다. Long Task는 측정 구간에 시작한 작업의 횟수·전체 duration 합이다. chat_burst의 렌더링 지표는 30초 부하 구간, 전달·마지막 INP·입력 완료는 정리 구간까지 확인한다.
+
+봇은 child_process.fork로 분리한다. Full jitter의 5회 재시도와 open 때 카운터 초기화를 그대로 사용한다. 개별 입장 시간, 끊김·close code·시도 소진, monitorEventLoopDelay(20ms resolution)의 최댓값과 p95를 기록한다. 서버의 선택적 `--instrument <loadtest 안 파일>`은 asyncio 100ms 지연, async broadcast 소요 시간·연결 수, 1초 pool checkedout/overflow를 JSONL에 기록한다. 각 초 count·sum·max·상한 버킷 기반 p95 근사를 저장하며 메시지마다 파일을 쓰지 않는다. Node는 1초마다 ps의 CPU·RSS를 수집하고 끝에 서버 로그의 QueuePool 등장 횟수를 센다. SIGKILL 횟수도 회차에 남긴다.
+
+결과는 `results/stage2/<scenario>/b86324b/<condition>/n-<N>/run-<k>.json`, 환경은 같은 루트의 env JSON, 요약은 `results/stage2/SUMMARY.md`다. 원시 WS 프레임과 browser_artifacts는 저장하지 않고 미디어 샘플·값 배열·집계를 compact JSON으로 저장한다. 2MiB를 넘는 진단 배열이 생기면 샘플과 집계를 유지하고 배열 생략 이유를 남긴 스크립트 실패로 저장한다. 기존 결과는 성공 여부와 무관하게 건너뛰며 명시적 --force만 백업 후 재실행한다. 실패 회차를 자동 재시도하지 않는다.
+
+판정은 2026-11-04 확정한 규칙을 고정한다. PLAY_CORRECTION(steady), LOST, DUPLICATES, BOT_LOST, JOIN_FAILED, RETRY_EXHAUSTED, SETUP_FAILED, QUEUE_POOL, DISCONNECTED는 불합격 사유다. SCRIPT_ERROR도 표에서 FAIL이다. 한 회차라도 FAIL이면 같은 N은 FAIL이며 결측을 0으로 바꾸거나 회차를 제외하지 않는다. INP 200ms·전달 p95 1000ms는 시험 조건의 외부 기준 초과 여부를 별도 표시하고, err_p95 500ms는 공인 기준이 없는 자체 목표다. p75/p95를 포함한 각 지표의 회차 중앙값·최댓값을 남긴다. Long Task·프레임은 기록만 한다. 봇 이벤트 루프 p95 >100ms는 측정기 부하로 표시해 지연 값의 신뢰 한계를 설명하며 제외하지 않는다.
+
+스모크는 N=2/10, pool-250은 N=10, 회차 1회다. steady 20초, chat_burst 10초(정리 상한은 동일), join_burst 입장 후 10초, accumulation은 N=3에서 500개·체크포인트 100/500이다. CPU 4배도 포함한다.
+
+브라우저 없는 실제 서버·봇 기능 확인은 다음 명령이며, 측정 원본 대신 무시되는 .logs에 검증 로그를 남긴다. 중간 실패 로그도 보존한다.
+
+```bash
+node --test loadtest/test
+node loadtest/stage2/validate_backend.mjs
+```
+
+한계: 봇과 측정 대상이 같은 머신의 CPU·네트워크·DB를 공유한다. 봇은 렌더하지 않으며 실제 프론트 관찰자는 1명이다. 키보드·마우스 입력은 스크립트이므로 실제 사용자 행동 분포가 아니다. 4배 CPU 스로틀은 지정한 관찰자 페이지에만 적용된다. 로컬 영상 파일·동일 머신 시계·차단된 외부 요청 조건이며 원격 YouTube·실제 스피커 출력·운영 트래픽을 재현하지 않는다. 마커·샘플·성능 관측 배열의 계측 비용도 CPU·힙에 포함된다. 프로파일링 빌드의 추가 비용이 있으므로 accumulation 시간은 일반 빌드 시간과 직접 비교하지 않는다.

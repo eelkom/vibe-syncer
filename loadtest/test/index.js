@@ -3,3 +3,4 @@ import './stats.test.mjs';
 import './browser-observation.test.mjs';
 import './reconnect-conditions.test.mjs';
 import './review5.test.mjs';
+import './stage2.test.mjs';
