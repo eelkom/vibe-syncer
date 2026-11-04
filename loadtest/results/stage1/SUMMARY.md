@@ -2,20 +2,25 @@
 
 회차별 값의 중앙값 및 nearest-rank p75/p95. 회차가 5개면 nearest-rank p95는 최댓값과 같다. null/미기록은 제외하고 결측 회차 수로 표시한다. 실패 회차도 원본과 회차 수에 남긴다.
 
-host_unexpected_pauses > 0 또는 activation_before_first_click = true인 회차는 모든 지표의 중앙값·p75·p95 집계에서 제외하고 「호스트 멈춤 무효 회차」와 「활성화 오염 무효 회차」로 각각 센다(두 건수는 중복 가능). 원본은 유지하며 삭제·자동 재시도하지 않는다. 결측 회차는 이 제외 후의 회차에서 센다. 게스트 멈춤만으로는 제외하지 않는다.
+host_unexpected_pauses > 0, activation_before_first_click = true 또는 injection_effective = false인 회차는 모든 지표의 중앙값·p75·p95 집계에서 제외하고 호스트 멈춤·활성화 오염·주입 무효 회차로 각각 센다(건수는 중복 가능). 원본은 유지하며 삭제·자동 재시도하지 않는다. 결측 회차는 이 제외 후의 회차에서 센다. 게스트 멈춤만으로는 제외하지 않는다.
 
 sync_time_ms는 오차 500ms 미만, sync_time_2s_ms는 오차 2000ms 미만이 2초 유지되는 구간의 시작 시각이다. 2000ms는 앱의 재생 시작 시 보정 기준값이고, 500ms는 자체 목표값이다.
 
-history_race: 조회 요청과 응답에 **지연 주입**. autoplay/all-blocked: 사용자 활성화 전 play 및 autoplay 속성 차단 주입으로 저전력 모드 등을 모사한다. 사용자 반응 시간 1000ms가 결과에 포함된다. 주입 무효 회차는 injection_effective가 명시적으로 false인 회차만 센다.
+history_race: 조회 요청과 응답에 **지연 주입**. autoplay/all-blocked는 사용자 활성화 전 play를 즉시 거부하고, silent-blocked는 play Promise를 영구 대기시키며 재생을 시작하지 않는다. 둘 다 autoplay 속성을 차단한다. 사용자 반응 시간 1000ms가 결과에 포함된다. 주입 무효 회차는 injection_effective가 명시적으로 false인 회차만 센다.
+
+reconnect의 peak_*_per_s는 기존 고정 1초 구간 최고치다. peak_*_rolling_1s는 시도는 outage 이후, open은 listen 이후 이벤트의 이동 1초 구간 최고치이며 양 끝 시각 차이가 1000ms 미만인 이벤트를 센다.
 
 | 시나리오/커밋/조건 | 회차 | 스크립트 실패 | 소리 재생 실패 | 주입 무효 회차 | 호스트 멈춤 무효 회차 | 활성화 오염 무효 회차 |
 |---|---:|---:|---:|---:|---:|---:|
 | autoplay/a086001/all-blocked | 5 | 0 | 5 | 0 | 0 | 0 |
 | autoplay/a086001/muted-allowed | 5 | 0 | 0 | 0 | 0 | 0 |
+| autoplay/a086001/silent-blocked | 5 | 0 | 5 | 0 | 0 | 0 |
 | autoplay/b86324b/all-blocked | 5 | 0 | 0 | 0 | 0 | 0 |
 | autoplay/b86324b/muted-allowed | 5 | 0 | 0 | 0 | 0 | 0 |
+| autoplay/b86324b/silent-blocked | 5 | 0 | 0 | 0 | 0 | 0 |
 | autoplay/ea2acea/all-blocked | 5 | 0 | 0 | 0 | 0 | 0 |
 | autoplay/ea2acea/muted-allowed | 5 | 0 | 0 | 0 | 0 | 0 |
+| autoplay/ea2acea/silent-blocked | 5 | 0 | 0 | 0 | 0 | 0 |
 | history_race/08eb0e5/default | 5 | 0 | 0 | 0 | 0 | 0 |
 | history_race/32cdc26/default | 5 | 0 | 0 | 0 | 0 | 0 |
 | history_race/b86324b/default | 5 | 0 | 0 | 0 | 0 | 0 |
@@ -45,41 +50,62 @@ history_race: 조회 요청과 응답에 **지연 주입**. autoplay/all-blocked
 | autoplay/a086001/all-blocked | blocked_play_calls | 2 | 2 | 2 | 5 | 0 |
 | autoplay/a086001/all-blocked | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | autoplay/a086001/all-blocked | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
-| autoplay/a086001/muted-allowed | first_playback_ms | 709 | 807 | 813 | 5 | 0 |
-| autoplay/a086001/muted-allowed | audible_ms | 1608 | 1608 | 1613 | 5 | 0 |
+| autoplay/a086001/muted-allowed | first_playback_ms | 808 | 811 | 1360 | 5 | 0 |
+| autoplay/a086001/muted-allowed | audible_ms | 1708 | 1911 | 1961 | 5 | 0 |
 | autoplay/a086001/muted-allowed | clicks_count | 1 | 1 | 1 | 5 | 0 |
-| autoplay/a086001/muted-allowed | err_after_audible_ms | 5857.432 | 5880.507 | 6267.771 | 5 | 0 |
+| autoplay/a086001/muted-allowed | err_after_audible_ms | 5948.588 | 6311.539 | 7322.117 | 5 | 0 |
 | autoplay/a086001/muted-allowed | blocked_play_calls | null | null | null | 0 | 5 |
 | autoplay/a086001/muted-allowed | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | autoplay/a086001/muted-allowed | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
-| autoplay/b86324b/all-blocked | first_playback_ms | 1908 | 1913 | 2208 | 5 | 0 |
-| autoplay/b86324b/all-blocked | audible_ms | 1908 | 1913 | 2208 | 5 | 0 |
+| autoplay/a086001/silent-blocked | first_playback_ms | null | null | null | 0 | 5 |
+| autoplay/a086001/silent-blocked | audible_ms | null | null | null | 0 | 5 |
+| autoplay/a086001/silent-blocked | clicks_count | 1 | 1 | 1 | 5 | 0 |
+| autoplay/a086001/silent-blocked | err_after_audible_ms | null | null | null | 0 | 5 |
+| autoplay/a086001/silent-blocked | blocked_play_calls | 2 | 2 | 2 | 5 | 0 |
+| autoplay/a086001/silent-blocked | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/a086001/silent-blocked | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/b86324b/all-blocked | first_playback_ms | 1908 | 1909 | 2149 | 5 | 0 |
+| autoplay/b86324b/all-blocked | audible_ms | 1908 | 1909 | 2149 | 5 | 0 |
 | autoplay/b86324b/all-blocked | clicks_count | 1 | 1 | 1 | 5 | 0 |
-| autoplay/b86324b/all-blocked | err_after_audible_ms | 1788.921 | 1813.759 | 1981.383 | 5 | 0 |
+| autoplay/b86324b/all-blocked | err_after_audible_ms | 1786.878 | 1800.38 | 1825.492 | 5 | 0 |
 | autoplay/b86324b/all-blocked | blocked_play_calls | 2 | 2 | 2 | 5 | 0 |
 | autoplay/b86324b/all-blocked | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | autoplay/b86324b/all-blocked | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
-| autoplay/b86324b/muted-allowed | first_playback_ms | 708 | 708 | 807 | 5 | 0 |
+| autoplay/b86324b/muted-allowed | first_playback_ms | 808 | 808 | 808 | 5 | 0 |
 | autoplay/b86324b/muted-allowed | audible_ms | 1608 | 1608 | 1608 | 5 | 0 |
 | autoplay/b86324b/muted-allowed | clicks_count | 1 | 1 | 1 | 5 | 0 |
-| autoplay/b86324b/muted-allowed | err_after_audible_ms | 632.163 | 636.676 | 652.956 | 5 | 0 |
+| autoplay/b86324b/muted-allowed | err_after_audible_ms | 674.205 | 675.322 | 723.479 | 5 | 0 |
 | autoplay/b86324b/muted-allowed | blocked_play_calls | null | null | null | 0 | 5 |
 | autoplay/b86324b/muted-allowed | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | autoplay/b86324b/muted-allowed | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
-| autoplay/ea2acea/all-blocked | first_playback_ms | 1909 | 1909 | 1910 | 5 | 0 |
-| autoplay/ea2acea/all-blocked | audible_ms | 1909 | 1909 | 1910 | 5 | 0 |
+| autoplay/b86324b/silent-blocked | first_playback_ms | 3910 | 3911 | 4406 | 5 | 0 |
+| autoplay/b86324b/silent-blocked | audible_ms | 3910 | 3911 | 4406 | 5 | 0 |
+| autoplay/b86324b/silent-blocked | clicks_count | 2 | 2 | 2 | 5 | 0 |
+| autoplay/b86324b/silent-blocked | err_after_audible_ms | 3744.44 | 3762.994 | 4279.963 | 5 | 0 |
+| autoplay/b86324b/silent-blocked | blocked_play_calls | 3 | 3 | 3 | 5 | 0 |
+| autoplay/b86324b/silent-blocked | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/b86324b/silent-blocked | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/ea2acea/all-blocked | first_playback_ms | 1910 | 2029 | 2447 | 5 | 0 |
+| autoplay/ea2acea/all-blocked | audible_ms | 1910 | 2029 | 2447 | 5 | 0 |
 | autoplay/ea2acea/all-blocked | clicks_count | 1 | 1 | 1 | 5 | 0 |
-| autoplay/ea2acea/all-blocked | err_after_audible_ms | 7021.106 | 7037.739 | 7040.955 | 5 | 0 |
+| autoplay/ea2acea/all-blocked | err_after_audible_ms | 7157.466 | 7501.584 | 7806.225 | 5 | 0 |
 | autoplay/ea2acea/all-blocked | blocked_play_calls | 0 | 0 | 0 | 5 | 0 |
 | autoplay/ea2acea/all-blocked | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | autoplay/ea2acea/all-blocked | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
-| autoplay/ea2acea/muted-allowed | first_playback_ms | 1908 | 1909 | 1909 | 5 | 0 |
-| autoplay/ea2acea/muted-allowed | audible_ms | 1908 | 1909 | 1909 | 5 | 0 |
+| autoplay/ea2acea/muted-allowed | first_playback_ms | 2109 | 2110 | 2148 | 5 | 0 |
+| autoplay/ea2acea/muted-allowed | audible_ms | 2109 | 2110 | 2148 | 5 | 0 |
 | autoplay/ea2acea/muted-allowed | clicks_count | 1 | 1 | 1 | 5 | 0 |
-| autoplay/ea2acea/muted-allowed | err_after_audible_ms | 7020.947 | 7039.989 | 7043.478 | 5 | 0 |
+| autoplay/ea2acea/muted-allowed | err_after_audible_ms | 7401.619 | 7488.796 | 8045.208 | 5 | 0 |
 | autoplay/ea2acea/muted-allowed | blocked_play_calls | null | null | null | 0 | 5 |
 | autoplay/ea2acea/muted-allowed | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | autoplay/ea2acea/muted-allowed | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/ea2acea/silent-blocked | first_playback_ms | 2011 | 2042 | 2458 | 5 | 0 |
+| autoplay/ea2acea/silent-blocked | audible_ms | 2011 | 2042 | 2458 | 5 | 0 |
+| autoplay/ea2acea/silent-blocked | clicks_count | 1 | 1 | 1 | 5 | 0 |
+| autoplay/ea2acea/silent-blocked | err_after_audible_ms | 7439.768 | 7724.957 | 9515.637 | 5 | 0 |
+| autoplay/ea2acea/silent-blocked | blocked_play_calls | 0 | 0 | 0 | 5 | 0 |
+| autoplay/ea2acea/silent-blocked | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/ea2acea/silent-blocked | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | history_race/08eb0e5/default | lost_a | 0 | 0 | 0 | 5 | 0 |
 | history_race/08eb0e5/default | lost_b | 25 | 25 | 25 | 5 | 0 |
 | history_race/08eb0e5/default | dup_a | 0 | 0 | 0 | 5 | 0 |
@@ -198,18 +224,24 @@ history_race: 조회 요청과 응답에 **지연 주입**. autoplay/all-blocked
 | reconnect/1b2e6c4/browser-10 | tabs_gave_up | 0 | 0 | 0 | 3 | 0 |
 | reconnect/1b2e6c4/exponential | peak_attempts_per_s | null | null | null | 0 | 1 |
 | reconnect/1b2e6c4/exponential | peak_opens_per_s | null | null | null | 0 | 1 |
+| reconnect/1b2e6c4/exponential | peak_attempts_rolling_1s | null | null | null | 0 | 1 |
+| reconnect/1b2e6c4/exponential | peak_opens_rolling_1s | null | null | null | 0 | 1 |
 | reconnect/1b2e6c4/exponential | time_to_all_reconnected_ms | null | null | null | 0 | 1 |
 | reconnect/1b2e6c4/exponential | reconnected | null | null | null | 0 | 1 |
 | reconnect/1b2e6c4/exponential | gave_up | null | null | null | 0 | 1 |
 | reconnect/1b2e6c4/exponential | pending | null | null | null | 0 | 1 |
 | reconnect/1b2e6c4/exponential-14 | peak_attempts_per_s | 14 | 14 | 14 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-14 | peak_opens_per_s | 14 | 14 | 14 | 5 | 0 |
+| reconnect/1b2e6c4/exponential-14 | peak_attempts_rolling_1s | 14 | 14 | 14 | 5 | 0 |
+| reconnect/1b2e6c4/exponential-14 | peak_opens_rolling_1s | 14 | 14 | 14 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-14 | time_to_all_reconnected_ms | 1973 | 2048 | 2142 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-14 | reconnected | 14 | 14 | 14 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-14 | gave_up | 0 | 0 | 0 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-14 | pending | 0 | 0 | 0 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-200-pool | peak_attempts_per_s | 200 | 200 | 200 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-200-pool | peak_opens_per_s | 137 | 138 | 139 | 5 | 0 |
+| reconnect/1b2e6c4/exponential-200-pool | peak_attempts_rolling_1s | 200 | 200 | 200 | 5 | 0 |
+| reconnect/1b2e6c4/exponential-200-pool | peak_opens_rolling_1s | 140 | 141 | 151 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-200-pool | time_to_all_reconnected_ms | 10594 | 10670 | 10681 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-200-pool | reconnected | 200 | 200 | 200 | 5 | 0 |
 | reconnect/1b2e6c4/exponential-200-pool | gave_up | 0 | 0 | 0 | 5 | 0 |
@@ -221,12 +253,16 @@ history_race: 조회 요청과 응답에 **지연 주입**. autoplay/all-blocked
 | reconnect/b86324b/browser-10 | tabs_gave_up | 0 | 1 | 1 | 3 | 0 |
 | reconnect/b86324b/full-jitter-14 | peak_attempts_per_s | 15 | 16 | 20 | 5 | 0 |
 | reconnect/b86324b/full-jitter-14 | peak_opens_per_s | 3 | 4 | 5 | 5 | 0 |
+| reconnect/b86324b/full-jitter-14 | peak_attempts_rolling_1s | 18 | 20 | 20 | 5 | 0 |
+| reconnect/b86324b/full-jitter-14 | peak_opens_rolling_1s | 4 | 4 | 5 | 5 | 0 |
 | reconnect/b86324b/full-jitter-14 | time_to_all_reconnected_ms | 12521.5 | 13082 | 15304 | 4 | 1 |
 | reconnect/b86324b/full-jitter-14 | reconnected | 14 | 14 | 14 | 5 | 0 |
 | reconnect/b86324b/full-jitter-14 | gave_up | 0 | 0 | 1 | 5 | 0 |
 | reconnect/b86324b/full-jitter-14 | pending | 0 | 0 | 0 | 5 | 0 |
 | reconnect/b86324b/full-jitter-200-pool | peak_attempts_per_s | 211 | 218 | 225 | 5 | 0 |
 | reconnect/b86324b/full-jitter-200-pool | peak_opens_per_s | 49 | 50 | 60 | 5 | 0 |
+| reconnect/b86324b/full-jitter-200-pool | peak_attempts_rolling_1s | 254 | 260 | 260 | 5 | 0 |
+| reconnect/b86324b/full-jitter-200-pool | peak_opens_rolling_1s | 49 | 52 | 60 | 5 | 0 |
 | reconnect/b86324b/full-jitter-200-pool | time_to_all_reconnected_ms | null | null | null | 0 | 5 |
 | reconnect/b86324b/full-jitter-200-pool | reconnected | 198 | 199 | 199 | 5 | 0 |
 | reconnect/b86324b/full-jitter-200-pool | gave_up | 2 | 3 | 4 | 5 | 0 |
