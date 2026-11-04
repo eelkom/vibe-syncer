@@ -36,6 +36,7 @@ try {
   await writeFile(envPath, JSON.stringify(env, null, 2) + '\n');
   for (const job of jobs) {
     const { scenario, sha, serverSha, condition, runNumber } = job;
+    const measurementPoolSize = job.measurementPoolSize ?? null;
     const target = path.join(resultRoot, scenario, sha, condition, `run-${runNumber}.json`);
     let exists = false;
     try { await stat(target); exists = true; } catch {}
@@ -44,6 +45,7 @@ try {
     if (exists) await copyFile(target, target.replace('.json', `.previous-${stamp}.json`));
     const result = { scenario, commit: sha, commit_full: execFileSync('git', ['rev-parse', sha], { cwd: REPO, encoding: 'utf8' }).trim(),
       server_commit: serverSha, condition, run: runNumber, started_at: new Date().toISOString(),
+      measurement_pool_size: measurementPoolSize,
       environment: path.relative(ROOT, envPath), smoke: opts.smoke, metrics: {},
       blocked_external_requests: 0, errors: [], ok: false };
     const cleanup = [];
@@ -52,7 +54,7 @@ try {
     console.log(`RUN ${scenario} ${sha} ${condition} #${runNumber}`);
     try {
       await createDatabase(database); created = true;
-      server = await startServer(serverSha, database);
+      server = await startServer(serverSha, database, measurementPoolSize);
       result.server_logs = [path.relative(ROOT, server.logPath)];
       const data = await seed(database);
       const botOnly = scenario === 'reconnect' && condition !== 'browser-10';
@@ -67,7 +69,7 @@ try {
         const exitedAt = Date.now();
         result.server_restart = { exited_at: exitedAt, fixed_wait_ms: 3000 };
         await sleep(3000);
-        server = await startServer(serverSha, database);
+        server = await startServer(serverSha, database, measurementPoolSize);
         result.server_logs.push(path.relative(ROOT, server.logPath));
         result.server_restart.listen_at = server.listenAt;
         return server;

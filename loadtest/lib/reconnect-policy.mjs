@@ -5,7 +5,7 @@ export const MAX_ATTEMPTS = 5;
 // b86324b also resets at effect mount (95); bot constructor starts at zero.
 export function reconnectDelay(condition, attempt, random = Math.random) {
   const cap = Math.min(30000, 1000 * 2 ** attempt);
-  if (condition === 'exponential') return cap;
-  if (condition === 'full-jitter') return random() * cap;
+  if (condition.startsWith('exponential')) return cap;
+  if (condition.startsWith('full-jitter')) return random() * cap;
   throw new Error(`Unknown reconnect policy: ${condition}`);
 }

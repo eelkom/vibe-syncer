@@ -8,8 +8,8 @@ import { peakPerSecond, stddev, browserReconnectState } from '../lib/stats.mjs';
 export async function run(ctx) {
   return ctx.condition === 'browser-10' ? browserRun(ctx) : botRun(ctx);
 }
-async function botRun({ cleanup, result, seed, smoke, condition, restart }) {
-  const count = smoke ? 10 : 200;
+async function botRun({ cleanup, result, seed, smoke, condition, restart, botCount }) {
+  const count = botCount;
   const traces = [];
   result.metrics = { raw: { bots: traces } };
   let stopped = false, outageAt = null;

@@ -11,12 +11,28 @@ import time
 from urllib.parse import urlparse
 
 
+def configure_measurement_pool(pool_size):
+    if pool_size is None:
+        logging.info("STAGE1 database pool: application defaults (no override)")
+        return
+    import sqlalchemy
+    create_engine = sqlalchemy.create_engine
+    def measurement_create_engine(*args, **kwargs):
+        kwargs.update(pool_size=pool_size, max_overflow=0)
+        return create_engine(*args, **kwargs)
+    sqlalchemy.create_engine = measurement_create_engine
+    logging.info("STAGE1 measurement database pool: pool_size=%d max_overflow=0", pool_size)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("backend", type=Path)
     parser.add_argument("port", type=int)
     parser.add_argument("--database-url", required=True)
+    parser.add_argument("--measurement-pool-size", type=int)
     args = parser.parse_args()
+    if args.measurement_pool_size is not None and not 1 <= args.measurement_pool_size <= 300:
+        parser.error("--measurement-pool-size must be in [1, 300]")
     url = urlparse(args.database_url)
     if url.hostname != "127.0.0.1" or url.port != 55432:
         parser.error("DATABASE_URL must target 127.0.0.1:55432")
@@ -47,6 +63,8 @@ def main():
             raise RuntimeError(f"Stage1 outbound connection denied: {address}")
         return original_connect(sock, address)
     socket.socket.connect = local_connect
+    # app.ai imports utils/models/database, so configure before any app import.
+    configure_measurement_pool(args.measurement_pool_size)
     sys.path.insert(0, str(args.backend.resolve()))
     ai = importlib.import_module("app.ai")
     if not hasattr(ai, "client") or ai.client is not None:
