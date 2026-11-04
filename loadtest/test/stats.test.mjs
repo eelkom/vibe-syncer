@@ -1,0 +1,82 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { median, percentile, interpolate, positionErrors, syncTime, peakPerSecond, countMarkers, firstPlayback, stddev } from '../lib/stats.mjs';
+import { MAX_ATTEMPTS, reconnectDelay } from '../lib/reconnect-policy.mjs';
+import { summarizeRuns, markdown } from '../summarize.mjs';
+import { parseArgs, plan } from '../lib/config.mjs';
+const sample = (t, ct, paused = false) => ({ t, ct, paused, muted: false, volume: 1 });
+test('nearest-rank p95 uses ceil, handles empty and one value', () => {
+  assert.equal(percentile(Array.from({ length: 20 }, (_, i) => i + 1)), 19);
+  assert.equal(percentile([1, 2, 3, 4, 5]), 5);
+  assert.equal(percentile([4]), 4); assert.equal(percentile([]), null);
+});
+test('median: odd, even, null and zero', () => {
+  assert.equal(median([3, 1, 2]), 2); assert.equal(median([4, 2, 1, 3]), 2.5);
+  assert.equal(median([null, 0, 2]), 1); assert.equal(median([null]), null);
+});
+test('interpolate at guest clock; no extrapolation, paused host excluded', () => {
+  const host = [sample(1000, 5), sample(1200, 5.2)];
+  assert.equal(interpolate(host, 1100), 5.1);
+  assert.equal(interpolate(host, 1000), 5); assert.equal(interpolate(host, 999), null);
+  assert.equal(interpolate([host[0], sample(1200, 5.2, true)], 1100), null);
+  const result = positionErrors(host, [sample(1100, 5), sample(1150, 5.1, true), { t: 1200, none: true }]);
+  assert.ok(Math.abs(result[0].err - 100) < 1e-8);
+  assert.equal(result[1].err, null); assert.equal(result[2].err, null);
+});
+test('sync starts only after full two seconds strictly below 500ms', () => {
+  const a = Array.from({ length: 31 }, (_, i) => ({ t: 1000 + i * 100, err: 200 }));
+  assert.equal(syncTime(a.slice(0, 20), 1000), null);
+  assert.equal(syncTime(a.slice(0, 21), 1000), 0);
+  a[5].err = 500; assert.equal(syncTime(a, 1000), 600);
+  a[5].err = null; assert.equal(syncTime(a, 1000), 600);
+});
+test('sync does not bridge sampling gaps or a paused sample', () => {
+  assert.equal(syncTime([{ t: 0, err: 0 }, { t: 2000, err: 0 }], 0), null);
+  const a = Array.from({ length: 30 }, (_, i) => ({ t: i * 100, err: i === 15 ? null : 0 }));
+  assert.equal(syncTime(a, 0), null);
+});
+test('one-second fixed bins include boundaries and exclude prior events', () => {
+  assert.equal(peakPerSecond([999, 1000, 1999, 2000, 2001, 2999], 1000), 3);
+  assert.equal(peakPerSecond([], 0), 0);
+});
+test('source exponential delay and five retry budget', () => {
+  assert.equal(MAX_ATTEMPTS, 5);
+  assert.deepEqual(Array.from({ length: 5 }, (_, i) => reconnectDelay('exponential', i)), [1000, 2000, 4000, 8000, 16000]);
+  assert.equal(reconnectDelay('exponential', 6), 30000);
+});
+test('full jitter is [0, min(cap, base*2^attempt)), including cap', () => {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const cap = Math.min(30000, 1000 * 2 ** attempt);
+    assert.equal(reconnectDelay('full-jitter', attempt, () => 0), 0);
+    assert.ok(reconnectDelay('full-jitter', attempt, () => 1 - Number.EPSILON) < cap);
+    assert.equal(reconnectDelay('full-jitter', attempt, () => 0.5), cap / 2);
+  }
+});
+test('markers are exact tokens and duplicates count only excess occurrences', () => {
+  const r = countMarkers('m-1-1\nm-1-10 m-1-1 xm-1-2 m-1-2x', ['m-1-1', 'm-1-2', 'm-1-10']);
+  assert.equal(r.unique, 2); assert.equal(r.duplicates, 1); assert.deepEqual(r.missing, ['m-1-2']);
+});
+test('summarize never converts null/missing failed runs to zero', () => {
+  const runs = [10, null, 30, undefined].map((v, i) => ({ scenario: 'late_join', commit: 'abc', condition: 'default', ok: i !== 3,
+    metrics: i === 3 ? {} : { sync_time_ms: v } }));
+  const g = summarizeRuns(runs)[0];
+  assert.deepEqual(g.metrics.sync_time_ms, { median: 20, p95: 30, valid: 2, missing: 2 });
+  assert.equal(g.script_failed, 1);
+  const allNull = summarizeRuns([{ ...runs[0], metrics: { sync_time_ms: null } }])[0];
+  assert.equal(allNull.metrics.sync_time_ms.median, null);
+  assert.match(markdown([allNull]), /null \| null \| 0 \| 1/);
+});
+test('playback/audible timestamps require .2s advancement and audible state', () => {
+  const a = [sample(0, 5), sample(100, 5.1), sample(300, 5.3)];
+  a[0].muted = true;
+  assert.equal(firstPlayback(a, 0), 300); assert.equal(firstPlayback(a, 0, true), 300);
+  assert.equal(firstPlayback([sample(0, 1, true), sample(100, 5)], 0), null);
+  assert.equal(stddev([1, 3]), 1);
+});
+test('plan uses fixed commits, smoke size and independent browser run default', () => {
+  const jobs = plan(parseArgs(['--scenario', 'reconnect']));
+  assert.equal(jobs.filter(j => j.condition === 'browser-10').length, 6);
+  assert.ok(jobs.filter(j => j.condition !== 'browser-10').every(j => j.serverSha === 'b86324b'));
+  assert.equal(plan(parseArgs(['--scenario', 'message_burst', '--smoke'])).length, 2);
+  assert.equal(plan(parseArgs(['--scenario', 'autoplay', '--smoke', '--runs', '100'])).length, 6);
+});
