@@ -1,12 +1,12 @@
 import { median, percentile, positionErrors } from '../lib/stats.mjs';
 export const distribution = values => ({ p50: median(values), p75: percentile(values, .75), p95: percentile(values), max: values.length ? Math.max(...values) : null });
-export function delivery(sent, displayed, control = null) {
+export function delivery(sent, displayed, control = null, sentAt = new Map()) {
   const visible = new Map(displayed.map(m => [m[0], m]));
   const expected = new Set(sent), delays = []; let lost = 0, duplicates = 0;
   for (const marker of expected) {
     const row = visible.get(marker);
     if (!row) lost++;
-    else { const t = Number(marker.match(/-(\d+)$/)?.[1]); delays.push(row[1] - t); duplicates += Math.max(0, row[2] - 1); }
+    else { const t = sentAt.get(marker) ?? Number(marker.match(/-(\d+)$/)?.[1]); delays.push(row[1] - t); duplicates += Math.max(0, row[2] - 1); }
   }
   return { delivery_ms: distribution(delays), delivery_values_ms: delays, sent: expected.size, lost, duplicates,
     server_side_lost: control === null ? null : [...expected].filter(m => !control.has(m)).length };
@@ -42,6 +42,8 @@ export function verdict(run) {
   const m = run.metrics ?? {}, reasons = [];
   const add = (yes, code) => { if (yes) reasons.push(code); };
   add(!run.ok, 'SCRIPT_ERROR'); add(run.setup_failed, 'SETUP_FAILED');
+  add(m.host_action_timeouts > 0, 'HOST_SYNC_TIMEOUT');
+  add(m.input_stuck || m.page_unresponsive, 'PAGE_STUCK');
   add(run.scenario === 'steady' && m.play_correction_seeks > 0, 'PLAY_CORRECTION');
   add(m.lost > 0, 'LOST'); add(m.duplicates > 0, 'DUPLICATES'); add(m.server_side_lost > 0, 'BOT_LOST');
   add(m.join_failed === true || m.bot_join_failed > 0, 'JOIN_FAILED');

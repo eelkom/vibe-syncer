@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { ROOT, FRONT, until } from '../lib/common.mjs';
 import { tab as stage1Tab, selectors, scriptedUser } from '../lib/browser.mjs';
 import { installCollector } from './collector.mjs';
@@ -22,8 +23,10 @@ export async function makePage(browser, identity, result, cleanup, profiling = f
   }
   state.page.removeAllListeners('console'); state.page.removeAllListeners('pageerror');
   state.controls = {}; state.connected = false; state.checkpoints = []; state.delivered = new Set(); state.console_error_count = 0;
-  await state.page.addInitScript({ path: path.join(ROOT, 'node_modules/web-vitals/dist/web-vitals.iife.js') });
+  const vitals = readFileSync(path.join(ROOT, 'node_modules/web-vitals/dist/web-vitals.iife.js'), 'utf8');
+  await state.page.addInitScript({ content: vitals + '\n;window.webVitals=webVitals;' });
   await state.page.addInitScript(installCollector, { profiling, checkpoints });
+  state.page.on('crash', () => { state.crashed = true; });
   state.page.on('console', msg => {
     const text = msg.text();
     if (msg.type() === 'error') { state.console_error_count++; if (state.consoleErrors.length < 20) state.consoleErrors.push(text.slice(0, 500)); }
@@ -51,18 +54,34 @@ export async function readyGuest(state, room, cleanup, result) {
   await until(() => state.connected && state.controls.input && state.clicks.length >= 1 && state.media && !state.media.muted && !state.media.paused, 20000, 'guest connected and unmute clicked once');
   await stop();
 }
-export async function readPage(state) {
-  return state.page.evaluate(() => {
+// Only a timer owned here is a known non-response. Rejections from Playwright
+// or evaluated code remain script errors; closed/crashed browsers are ambiguous.
+export async function settleWithin(promise, ms) {
+  const expired = Symbol('expired'); let timer;
+  try {
+    const value = await Promise.race([promise, new Promise(resolve => { timer = setTimeout(() => resolve(expired), ms); })]);
+    return value === expired ? { timedOut: true } : { timedOut: false, value };
+  } finally { clearTimeout(timer); }
+}
+export async function readPage(state, timeout = 15000) {
+  const snapshot = await settleWithin(state.page.evaluate(() => {
     const s = window.__stage2;
     return { ...s, displayed: s.displayed() };
-  });
+  }), timeout);
+  if (!snapshot.timedOut) return snapshot.value;
+  if (state.crashed || state.page.isClosed() || !state.page.context().browser()?.isConnected()) {
+    throw new Error('Final snapshot timed out with a closed/crashed page or disconnected browser');
+  }
+  state.unresponsive = true;
+  return null;
 }
-export async function input(state, sequence) {
+export async function input(state, sequence, onStart = () => {}) {
   const control = state.controls.input;
   if (!control) throw new Error('Chat input coordinates unavailable');
-  await state.page.mouse.click(control.x, control.y);
   const start = Date.now(), marker = `c-g-${sequence}-${start}`;
+  const attempt = { marker, start, end: null }; onStart(attempt);
+  await state.page.mouse.click(control.x, control.y);
   await state.page.keyboard.type(marker); await state.page.keyboard.press('Enter');
-  return { marker, start, end: Date.now() };
+  attempt.end = Date.now(); return attempt;
 }
 export { selectors };

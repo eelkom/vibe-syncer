@@ -11,7 +11,7 @@ import { SHA, options, plan, skipAfterFailures } from './stage2/config.mjs';
 import { seedStage2 } from './stage2/seed.mjs';
 import { launchStage2, makePage, navigate, readyGuest, readPage } from './stage2/browser.mjs';
 import { startBots } from './stage2/bots.mjs';
-import { monitorServer } from './stage2/monitor.mjs';
+import { monitorServer, serverSummary } from './stage2/monitor.mjs';
 import { runScenario } from './stage2/scenarios.mjs';
 import { metrics, boundedJSON } from './stage2/metrics.mjs';
 import { verdict } from './stage2/stats.mjs';
@@ -75,8 +75,10 @@ try {
       result.phase = 'observation'; await runScenario(ctx);
       // First observer evaluation is after runScenario has finished observing.
       result.phase = 'read';
-      hostData = await deadline(readPage(host), 15000, 'host final snapshot'); guestData = await deadline(readPage(guest), 15000, 'observer final snapshot'); if (joiner) joinData = await deadline(readPage(joiner), 15000, 'entrant final snapshot');
-      if (!guestData.vitals_ready) throw new Error('web-vitals IIFE/onINP was not initialized');
+      hostData = await readPage(host); guestData = await readPage(guest); if (joiner) joinData = await readPage(joiner);
+      result.page_read_issues = [['host', host], ['guest', guest], ['entrant', joiner]].filter(([, state]) => state?.unresponsive)
+        .map(([page]) => ({ page, reason: 'FINAL_EVALUATION_DID_NOT_RESPOND', timeout_ms: 15000 }));
+      if (guestData && !guestData.vitals_ready) throw new Error('web-vitals IIFE/onINP was not initialized');
       botData = await bots.snapshot();
       result.metrics = metrics(ctx, hostData, guestData, botData, joinData);
       result.ok = true;
@@ -94,7 +96,7 @@ try {
       if (!result.ok && ctx) {
         result.failure = { phase: result.phase, bot_status: bots?.status, host_connected: ctx.host?.connected ?? null,
           guest_connected: ctx.guest?.connected ?? null, host_console: ctx.host?.consoleErrors.slice(0, 20) ?? [], guest_console: ctx.guest?.consoleErrors.slice(0, 20) ?? [] };
-        try { if (ctx.host) hostData ??= await deadline(readPage(ctx.host), 10000, 'failed host snapshot'); if (ctx.guest) guestData ??= await deadline(readPage(ctx.guest), 10000, 'failed observer snapshot');
+        try { if (ctx.host && !ctx.host.unresponsive) hostData ??= await readPage(ctx.host, 10000); if (ctx.guest && !ctx.guest.unresponsive) guestData ??= await readPage(ctx.guest, 10000);
           result.metrics.raw = { host_samples: (hostData?.samples ?? []).map(s => [s.t,s.ct ?? null,s.paused,s.muted,s.volume]), guest_samples: (guestData?.samples ?? []).map(s => [s.t,s.ct ?? null,s.paused,s.muted,s.volume]) }; } catch (error) { result.errors.push(`failure samples: ${error.message}`); }
       }
       for (const close of cleanup.reverse()) try { await deadline(close(), 10000, 'stage2 resource cleanup'); } catch (error) { result.errors.push(`cleanup: ${error.message}`); result.ok = false; }
@@ -103,6 +105,7 @@ try {
         await monitor.stop();
         try { result.server = await monitor.result(); } catch (error) { result.errors.push(`server metrics: ${error.message}`); result.ok = false; }
       }
+      result.server_summary = serverSummary(result.server, ctx?.start, ctx?.end, result.server_forced_kills);
       if (created) try { await dropDatabase(database); } catch (error) { result.errors.push(`DB cleanup: ${error.message}`); result.ok = false; }
       delete result.browser_artifacts;
       result.finished_at = new Date().toISOString(); result.verdict = verdict(result);

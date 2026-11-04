@@ -56,8 +56,9 @@ export function installCollector({ profiling, checkpoints = [] }) {
     });
     const send = socket.send;
     socket.send = function (data) {
-      if (typeof data === 'string') for (const match of data.matchAll(/c-[bg]\d*-\d+-\d+/g)) s.sent.push(match[0]);
-      return send.call(this, data);
+      const t = Date.now(), open = this.readyState === Native.OPEN, result = send.call(this, data);
+      if (open && typeof data === 'string') for (const match of data.matchAll(/c-[bg]\d*-\d+-\d+/g)) s.sent.push([match[0], t]);
+      return result;
     };
     return socket;
   } });

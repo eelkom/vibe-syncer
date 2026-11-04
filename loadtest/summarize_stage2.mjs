@@ -9,7 +9,12 @@ const fields = ['inp_ms', 'delivery_ms.p50', 'delivery_ms.p75', 'delivery_ms.p95
   'join_err_p50', 'join_err_p75', 'join_err_p95', 'join_ms', 'bot_join_ms.p50', 'bot_join_ms.p75', 'bot_join_ms.p95',
   'lost', 'duplicates', 'server_side_lost', 'play_correction_seeks', 'input_count', 'long_task_count', 'long_task_sum_ms',
   'dropped_frames', 'total_frames', 'react_commits', 'react_commit_ms.p50', 'react_commit_ms.p75', 'react_commit_ms.p95',
-  'heap_start', 'heap_end', 'heap_max', 'bot_event_loop.p95_ms', 'bot_event_loop.max_ms', 'system_messages', 'welcome_messages'];
+  'heap_start', 'heap_end', 'heap_max', 'bot_event_loop.p95_ms', 'bot_event_loop.max_ms', 'system_messages', 'welcome_messages',
+  'bot_disconnects', 'host_disconnects', 'guest_disconnects', 'bot_gave_up', 'bot_join_failed', 'host_action_timeouts', 'bot_unsent', 'guest_unsent',
+  'connected_at_setup', 'server_summary.event_loop_max_ms', 'server_summary.event_loop_p95_ms_approx_max',
+  'server_summary.broadcast_p95_ms_approx_max', 'server_summary.broadcast_sum_ms', 'server_summary.connections_max',
+  'server_summary.pool_checked_out_max', 'server_summary.cpu_peak', 'server_summary.rss_peak_bytes',
+  'server_summary.queuepool_errors', 'server_summary.server_forced_kills'];
 export function summarizeStage2(runs) {
   const groups = new Map();
   for (const run of runs) {
@@ -23,7 +28,8 @@ export function summarizeStage2(runs) {
       thresholds: Object.fromEntries(['inp_over_200', 'delivery_p95_over_1000', 'err_p95_over_500'].map(k => [k,
         decisions.some(d => d.external?.[k] === true) ? true : decisions.some(d => d.external?.[k] === false) ? false : null])),
       metrics: Object.fromEntries(fields.map(field => {
-        const values = numeric(active.map(r => field.split('.').reduce((obj, key) => obj?.[key], r.metrics)));
+        const values = numeric(active.map(r => field.split('.').reduce((obj, key) => obj?.[key],
+          field === 'connected_at_setup' || field.startsWith('server_summary.') ? r : r.metrics)));
         return [field, { median: median(values), max: values.length ? Math.max(...values) : null, missing: active.length - values.length }];
       })) };
   });

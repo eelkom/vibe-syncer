@@ -1,5 +1,5 @@
 import { sleep, until, deadline, FRONT } from '../lib/common.mjs';
-import { input } from './browser.mjs';
+import { input, settleWithin } from './browser.mjs';
 export async function waitAdmission(ctx, start = Date.now()) {
   const connected = () => Number(ctx.host.connected) + Number(ctx.guest.connected) + ctx.bots.status.connected + Number(ctx.joiner?.connected ?? false);
   await until(() => connected() >= ctx.job.n || Date.now() - start >= 60000, 61000, 'admission deadline');
@@ -11,12 +11,21 @@ export async function waitAdmission(ctx, start = Date.now()) {
   }
   return !ctx.result.setup_failed;
 }
-function inputQueue(ctx) {
-  let sequence = 0, pending = Promise.resolve();
-  return { enqueue(checkpoint = null) { pending = pending.then(async () => { ctx.inputs.push({ ...await input(ctx.guest, ++sequence), checkpoint }); }); pending.catch(() => {}); },
-    finish: (timeout = 30000) => deadline(pending, timeout, 'keyboard input completion') };
+export function inputQueue(ctx) {
+  let sequence = 0, pending = Promise.resolve(), stopped = false;
+  return { enqueue(checkpoint = null) {
+    pending = pending.then(() => {
+      if (!stopped) return input(ctx.guest, ++sequence, attempt => { attempt.checkpoint = checkpoint; ctx.inputs.push(attempt); });
+    }); pending.catch(() => {});
+  }, async finish(timeout = 30000) {
+    try {
+      const done = await settleWithin(pending, timeout);
+      if (done.timedOut) ctx.input_stuck = true;
+      return !done.timedOut;
+    } finally { stopped = true; }
+  } };
 }
-async function hostAction(ctx, action) {
+export async function hostAction(ctx, action) {
   const state = ctx.host, start = Date.now();
   if (action === 'seek') {
     const box = state.controls.seek, media = state.media;
@@ -31,8 +40,14 @@ async function hostAction(ctx, action) {
     if (!box) throw new Error('Host playback button unavailable');
     await state.page.mouse.click(box.x, box.y);
   }
-  await until(() => state.sent.some(f => f.t >= start && f.data.action === action), 5000, `host ${action} sync frame`);
+  const waitStarted = Date.now();
+  while (!state.sent.some(f => f.t >= start && f.data.action === action) && Date.now() - waitStarted < 5000) await sleep(50);
   const frame = state.sent.find(f => f.t >= start && f.data.action === action);
+  if (!frame) {
+    ctx.host_action_timeouts = (ctx.host_action_timeouts ?? 0) + 1;
+    (ctx.host_action_failures ??= []).push({ t: start, action });
+    return;
+  }
   ctx.actions.push({ t: frame.t, action, timestamp: frame.data.timestamp });
 }
 export async function runScenario(ctx) {
@@ -49,8 +64,8 @@ export async function runScenario(ctx) {
     ctx.guest.onCheckpoint = checkpoint => { ctx.checkpointInputs.push({ ...checkpoint, input_index: ctx.inputs.length }); queue.enqueue(checkpoint.target); };
     await ctx.bots.traffic({ mode: 'accumulation', total });
     await until(() => ctx.guest.checkpoints.some(c => c.target === total) || Date.now() - ctx.start >= 300000, 301000, 'accumulation deadline');
-    await queue.finish(Math.max(1, ctx.start + 300000 - Date.now()));
-    await until(() => ctx.inputs.every(i => ctx.guest.delivered.has(i.marker)) || Date.now() - ctx.start >= 300000,
+    const finished = await queue.finish(Math.max(1, ctx.start + 300000 - Date.now()));
+    if (finished) await until(() => ctx.inputs.every(i => ctx.guest.delivered.has(i.marker)) || Date.now() - ctx.start >= 300000,
       Math.max(1, ctx.start + 300000 - Date.now()) + 1000, 'checkpoint input echoes');
     // Fixed paint/event-timing tail, still inside the overall 300s bound.
     await sleep(Math.min(1000, Math.max(0, ctx.start + 300000 - Date.now())));

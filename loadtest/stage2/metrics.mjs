@@ -2,6 +2,8 @@ import { firstPlayback } from '../lib/stats.mjs';
 import { delivery, distribution, correctionSeeks, errorWindows, interactionCandidates } from './stats.mjs';
 const within = (rows, start, end) => rows.filter(r => (r[0] ?? r.t) >= start && (r[0] ?? r.t) <= end);
 export function pageMetrics(data, start, end, profiling) {
+  if (!data) return Object.fromEntries(['inp_ms', 'input_count', 'long_task_count', 'long_task_sum_ms', 'dropped_frames', 'total_frames',
+    'react_commits', 'heap_start', 'heap_end', 'heap_max', 'dom_nodes_start', 'dom_nodes_end'].map(k => [k, null]).concat([['react_commit_ms', distribution([])]]));
   const memory = within(data.memory, start, end), longtasks = within(data.longtasks, start, end), commits = within(data.commits, start, end);
   const raf = data.raf_events ? within(data.raf_events, start, end).map(r => [1, r[1]]) : Object.entries(data.raf).filter(([t]) => Number(t) >= start && Number(t) <= end).map(([, v]) => v);
   const heap = memory.map(r => r[1]).filter(Number.isFinite);
@@ -20,47 +22,59 @@ function gaveUp(ws, end) {
 const tupleSamples = samples => samples.map(s => s.none ? [s.t, null] : [s.t, s.ct, s.paused, s.muted, s.volume]);
 export function metrics(ctx, host, guest, bots, joiner) {
   const end = ctx.end, start = ctx.start;
-  const sent = [...bots.sent.map(([id, seq, t]) => `c-b${id}-${seq}-${t}`), ...ctx.inputs.map(i => i.marker)];
-  const chat = delivery(sent, guest.displayed, ctx.job.n > 2 ? new Set(bots.control.map(r => r[0])) : null);
-  const errors = errorWindows(host.samples, guest.samples, ctx.actions, end);
+  const botSent = bots.sent.filter(entry => entry[3] === true);
+  // Use the first successful socket.send for each guest marker, not typing time.
+  const guestSent = new Map();
+  for (const [marker, t] of guest?.sent ?? []) if (marker.startsWith('c-g-') && !guestSent.has(marker)) guestSent.set(marker, t);
+  const sent = [...botSent.map(([id, seq, t]) => `c-b${id}-${seq}-${t}`), ...guestSent.keys()];
+  const chat = delivery(sent, guest?.displayed ?? [], ctx.job.n > 2 ? new Set(bots.control.map(r => r[0])) : null, guestSent);
+  // Missing a snapshot is unknown, not evidence that all its messages were lost.
+  if (!guest) Object.assign(chat, { delivery_ms: distribution([]), delivery_values_ms: null, sent: null, lost: null, duplicates: null, server_side_lost: null });
+  const errors = host && guest ? errorWindows(host.samples, guest.samples, ctx.actions, end) : { steady: distribution([]), join: distribution([]) };
   const firstPause = ctx.actions.find(a => a.action === 'pause')?.t ?? Infinity;
   const aggregate = { ...pageMetrics(guest, start, ctx.trafficEnd ?? end, ctx.job.profiling), ...chat,
     err_ms: errors.steady, join_err_ms: errors.join,
     err_p50: errors.steady.p50, err_p75: errors.steady.p75, err_p95: errors.steady.p95,
     join_err_p50: errors.join.p50, join_err_p75: errors.join.p75, join_err_p95: errors.join.p95,
-    play_correction_seeks: correctionSeeks(guest.seeks, guest.sync, firstPause),
+    host_action_timeouts: ctx.host_action_timeouts ?? 0, input_stuck: ctx.input_stuck === true,
+    page_unresponsive: [ctx.host, ctx.guest, ctx.joiner].some(s => s?.unresponsive === true),
+    bot_unsent: bots.sent.length - botSent.length,
+    guest_unsent: guest ? ctx.inputs.filter(i => !guestSent.has(i.marker)).length : null,
+    play_correction_seeks: guest ? correctionSeeks(guest.seeks, guest.sync, firstPause) : null,
     bot_event_loop: bots.event_loop, bot_disconnects: bots.bots.reduce((sum, b) => sum + b.closes.length, 0),
     bot_gave_up: bots.gave_up, bot_join_failed: ctx.job.n - (ctx.job.scenario === 'join_burst' ? 3 : 2) - bots.bots.filter(b => b.join_ms !== null).length,
     bot_join_ms: distribution(bots.bots.map(b => b.join_ms).filter(Number.isFinite)),
-    host_disconnects: host.ws.filter(w => w.close_at !== null && w.close_at <= end).length,
-    guest_disconnects: guest.ws.filter(w => w.close_at !== null && w.close_at <= end).length,
-    host_reconnects: Math.max(0, host.ws.length - 1), guest_reconnects: Math.max(0, guest.ws.length - 1),
-    browser_gave_up: gaveUp(host.ws, end) + gaveUp(guest.ws, end),
-    system_messages: guest.system_events.filter(t => t >= start && t <= end).length, welcome_messages: guest.welcome_events.filter(t => t >= start && t <= end).length,
+    host_disconnects: host?.ws.filter(w => w.close_at !== null && w.close_at <= end).length ?? null,
+    guest_disconnects: guest?.ws.filter(w => w.close_at !== null && w.close_at <= end).length ?? null,
+    host_reconnects: host ? Math.max(0, host.ws.length - 1) : null, guest_reconnects: guest ? Math.max(0, guest.ws.length - 1) : null,
+    browser_gave_up: host && guest ? gaveUp(host.ws, end) + gaveUp(guest.ws, end) : null,
+    system_messages: guest?.system_events.filter(t => t >= start && t <= end).length ?? null, welcome_messages: guest?.welcome_events.filter(t => t >= start && t <= end).length ?? null,
     join_ms: joiner && ctx.joinSubmit ? firstPlayback(joiner.samples, ctx.joinSubmit) : null,
-    join_success: ctx.job.scenario === 'join_burst' ? Boolean(joiner && ctx.joinSubmit && firstPlayback(joiner.samples, ctx.joinSubmit) !== null) : null,
-    join_failed: ctx.job.scenario === 'join_burst' ? !joiner || !ctx.joinSubmit || firstPlayback(joiner.samples, ctx.joinSubmit) === null : false,
-    joiner_disconnects: joiner?.ws.filter(w => w.close_at !== null && w.close_at <= end).length ?? 0 };
-  aggregate.inp_ms = guest.inp.filter(r => r[0] <= end).at(-1)?.[1] ?? null;
-  aggregate.input_count = guest.inputs.filter(t => t >= start && t <= end).length;
-  if (joiner) aggregate.browser_gave_up += gaveUp(joiner.ws, end);
-  if (ctx.job.scenario === 'chat_accumulation') {
+    join_success: ctx.job.scenario === 'join_burst' && !ctx.joiner?.unresponsive ? Boolean(joiner && ctx.joinSubmit && firstPlayback(joiner.samples, ctx.joinSubmit) !== null) : null,
+    join_failed: ctx.job.scenario === 'join_burst' ? ctx.joiner?.unresponsive ? null : !joiner || !ctx.joinSubmit || firstPlayback(joiner.samples, ctx.joinSubmit) === null : false,
+    joiner_disconnects: ctx.joiner?.unresponsive ? null : joiner?.ws.filter(w => w.close_at !== null && w.close_at <= end).length ?? 0 };
+  aggregate.inp_ms = guest?.inp.filter(r => r[0] <= end).at(-1)?.[1] ?? null;
+  aggregate.input_count = guest?.inputs.filter(t => t >= start && t <= end).length ?? null;
+  if (joiner && aggregate.browser_gave_up !== null) aggregate.browser_gave_up += gaveUp(joiner.ws, end);
+  if (ctx.joiner?.unresponsive) aggregate.browser_gave_up = null;
+  if (ctx.job.scenario === 'chat_accumulation' && !guest) Object.assign(aggregate, { checkpoints: null, accumulation_received: null });
+  if (ctx.job.scenario === 'chat_accumulation' && guest) {
     let previous = start;
     aggregate.checkpoints = guest.checkpoints.map(cp => {
       const interval = pageMetrics(guest, previous, cp.t, true);
       const input = ctx.inputs.find(i => i.checkpoint === cp.target);
-      const candidates = input ? interactionCandidates(guest.candidates.filter(r => r[0] >= input.start && r[0] <= input.end + 1000)) : [];
+      const candidates = input && input.end !== null ? interactionCandidates(guest.candidates.filter(r => r[0] >= input.start && r[0] <= input.end + 1000)) : [];
       previous = cp.t;
       return { ...cp, ...interval, heap: cp.heap, dom_nodes: cp.dom_nodes, input: input ?? null, inp_candidates_ms: candidates };
     });
     aggregate.accumulation_received = guest.displayed.filter(r => /^c-b/.test(r[0])).length;
   }
-  aggregate.raw = { sample_columns: ['t', 'ct (null = absent)', 'paused', 'muted', 'volume'], host_samples: tupleSamples(host.samples), guest_samples: tupleSamples(guest.samples),
+  aggregate.raw = { sample_columns: ['t', 'ct (null = absent)', 'paused', 'muted', 'volume'], host_samples: host ? tupleSamples(host.samples) : null, guest_samples: guest ? tupleSamples(guest.samples) : null,
     joiner_samples: joiner ? tupleSamples(joiner.samples) : null,
-    bot_sent: bots.sent, displayed: guest.displayed, inputs: ctx.inputs, actions: ctx.actions,
-    longtasks: guest.longtasks, heap: guest.memory, inp: guest.inp, raf: guest.raf,
-    commit_durations: ctx.job.profiling ? guest.commits.map(c => c[1]) : null,
-    seeks: guest.seeks, sync: guest.sync, host_ws: host.ws, guest_ws: guest.ws, joiner_ws: joiner?.ws ?? null,
+    bot_sent: bots.sent, guest_sent: guest?.sent ?? null, displayed: guest?.displayed ?? null, inputs: ctx.inputs, actions: ctx.actions, host_action_failures: ctx.host_action_failures ?? [],
+    longtasks: guest?.longtasks ?? null, heap: guest?.memory ?? null, inp: guest?.inp ?? null, raf: guest?.raf ?? null,
+    commit_durations: ctx.job.profiling && guest ? guest.commits.map(c => c[1]) : null,
+    seeks: guest?.seeks ?? null, sync: guest?.sync ?? null, host_ws: host?.ws ?? null, guest_ws: guest?.ws ?? null, joiner_ws: joiner?.ws ?? null,
     bots: bots.bots, start, end, traffic_end: ctx.trafficEnd ?? end };
   return aggregate;
 }
