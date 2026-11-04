@@ -6,7 +6,7 @@ export async function run({ cleanup, result, seed, condition }) {
   const host = await tab(hb, seed.host, result, cleanup);
   await readyHost(host, seed.room);
   await sleep(5000);
-  const guest = await tab(gb, seed.guest, result, cleanup, condition === 'all-blocked');
+  const guest = await tab(gb, seed.guest, result, cleanup, condition);
   const stopUser = scriptedUser(guest, cleanup, result);
   await enter(guest, seed.room);
   await sleep(Math.max(0, guest.t0 + 30000 - Date.now()));
@@ -21,7 +21,7 @@ export async function run({ cleanup, result, seed, condition }) {
   const within = gs.filter(s => s.t <= guest.t0 + 30000);
   const audible = firstPlayback(within, guest.t0, true);
   const hs = await samples(host), errors = positionErrors(hs, gs);
-  const injection = condition === 'all-blocked' ? {
+  const injection = condition !== 'muted-allowed' ? {
     blocked: observation.blocked_play_calls, first_click: observation.user_click_events[0]?.t ?? null,
   } : null;
   return {
@@ -34,7 +34,11 @@ export async function run({ cleanup, result, seed, condition }) {
     blocked_play_calls: injection?.blocked ?? null,
     injection_effective: injection === null ? null
       : firstPlayback(gs.filter(s => s.t < Math.min(injection.first_click ?? Infinity, observationEnd)), guest.t0) === null,
-    injection: condition === 'all-blocked' ? 'play・autoplay 차단 주입: userActivation 전 play 거부 및 자동재생 속성 무시 (저전력 모드 모사)' : null,
+    injection: condition === 'all-blocked'
+      ? 'all-blocked 주입: userActivation 전 play 즉시 NotAllowedError 거부 및 autoplay 속성 무시'
+      : condition === 'silent-blocked'
+        ? 'silent-blocked 주입: userActivation 전 play Promise 영구 대기(재생 시작 안 함) 및 autoplay 속성 무시'
+        : null,
     raw: { t0: guest.t0, host_samples: hs, guest_samples: gs, errors, guest_console: guest.consoleErrors, host_sent: host.sent,
       host_last_play_click_at: host.lastPlayClickAt, user_click_events: observation.user_click_events,
       ws_log: observation.ws_log, observation_end: observationEnd },

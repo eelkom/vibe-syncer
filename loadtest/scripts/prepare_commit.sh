@@ -20,9 +20,13 @@ fi
 [[ $(cat "$DEST/.archive-sha") == "$SHA" ]] || { echo 'Archive mismatch/incomplete archive' >&2; exit 1; }
 if [[ ! -x loadtest/.venv/bin/python ]]; then uv venv --python 3.11 loadtest/.venv; fi
 loadtest/.venv/bin/python -c 'import sys; assert sys.version_info[:2] == (3,11), sys.version'
-# One shared environment, always the pinned comparison main's requirements, never a patch.
-uv pip install --python loadtest/.venv/bin/python -r "$ROOT/backend/requirements.txt"
+# One shared environment, pinned to the exact dependency versions used for measurement.
+uv pip install --python loadtest/.venv/bin/python -r "$ROOT/loadtest/requirements.lock"
 uv pip freeze --python loadtest/.venv/bin/python > loadtest/.logs/python-freeze.txt
+cmp -s loadtest/requirements.lock loadtest/.logs/python-freeze.txt || {
+  echo 'Python freeze differs from loadtest/requirements.lock; stopping' >&2
+  exit 1
+}
 (
   cd "$DEST/frontend"
   npm ci

@@ -27,10 +27,11 @@ export async function launch(cleanup, activation = false) {
   cleanup.push(() => browser.close());
   return browser;
 }
-export async function tab(browser, user, result, cleanup, allBlocked = false) {
+export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed') {
+  if (!['muted-allowed', 'all-blocked', 'silent-blocked'].includes(playbackCondition)) throw new Error(`Unknown playback condition: ${playbackCondition}`);
   const context = await browser.newContext({ serviceWorkers: 'block' });
   cleanup.push(() => context.close());
-  await context.addInitScript(({ user, allBlocked }) => {
+  await context.addInitScript(({ user, playbackCondition }) => {
     // All nine commits: contexts/UserContext.tsx:16-18 and types/user.ts:1-6
     // read this exact shape. Route is /room/:id in routes/routePath.ts:3.
     sessionStorage.setItem('user', JSON.stringify(user));
@@ -87,11 +88,12 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
         muted: el.muted, volume: el.volume, act: navigator.userActivation.hasBeenActive }
         : { t: Date.now(), none: true, act: navigator.userActivation.hasBeenActive });
     }, 100);
-    if (allBlocked) {
+    if (playbackCondition !== 'muted-allowed') {
       const play = HTMLMediaElement.prototype.play;
       HTMLMediaElement.prototype.play = function (...args) {
         if (!navigator.userActivation.hasBeenActive) {
           window.__blockedPlay++;
+          if (playbackCondition === 'silent-blocked') return new Promise(() => {});
           return Promise.reject(new DOMException('Stage1 all-blocked injection', 'NotAllowedError'));
         }
         return play.apply(this, args);
@@ -119,7 +121,7 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
         },
       });
     }
-  }, { user, allBlocked });
+  }, { user, playbackCondition });
   const page = await context.newPage();
   const state = { page, frames: [], sent: [], attempts: [], consoleErrors: [], responses: [], clicks: [], reconciledClicks: 0 };
   page.on('request', request => {

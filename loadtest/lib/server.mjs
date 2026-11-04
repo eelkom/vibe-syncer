@@ -15,6 +15,18 @@ export function serverArgs(sha, database, measurementPoolSize = null) {
   }
   return args;
 }
+export async function stopProcess(child, exited) {
+  if (child.exitCode !== null || child.signalCode !== null) return { forced: false };
+  try {
+    child.kill('SIGTERM');
+    await deadline(exited, 10000, 'server SIGTERM exit');
+    return { forced: false };
+  } catch {
+    const forced = child.kill('SIGKILL');
+    await deadline(exited, 10000, 'server SIGKILL exit');
+    return { forced };
+  }
+}
 export async function startServer(sha, database, measurementPoolSize = null) {
   // Refuse to attach to another process already occupying the measurement port.
   const probe = net.createServer();
@@ -29,12 +41,7 @@ export async function startServer(sha, database, measurementPoolSize = null) {
   child.on('error', error => { spawnError = error; });
   const handle = {
     child, exited, listenAt: null, logPath: path.join(ROOT, '.logs', `server-${database}-${child.pid}.log`),
-    async stop() {
-      if (child.exitCode !== null || child.signalCode !== null) return;
-      child.kill('SIGTERM');
-      // Always confirm process exit before restart or DB removal.
-      await deadline(exited, 10000, 'server SIGTERM exit');
-    },
+    stop: () => stopProcess(child, exited),
   };
   try {
     await until(async () => {

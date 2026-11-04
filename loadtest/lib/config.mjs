@@ -32,7 +32,7 @@ export function plan(opts) {
       for (const sha of ['1b2e6c4', MAIN]) jobs.push({ scenario, sha, serverSha: sha, condition: 'browser-10', defaultRuns: 3 });
     } else {
       const conditions = scenario === 'message_burst' ? (opts.smoke ? ['50'] : ['50', '200', '1000'])
-        : scenario === 'autoplay' ? ['muted-allowed', 'all-blocked'] : ['default'];
+        : scenario === 'autoplay' ? ['muted-allowed', 'all-blocked', 'silent-blocked'] : ['default'];
       for (const sha of COMPARISONS[scenario]) for (const condition of conditions) jobs.push({ scenario, sha, serverSha: sha, condition, defaultRuns: 5 });
     }
   }

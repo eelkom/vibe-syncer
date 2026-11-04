@@ -90,6 +90,28 @@ export function peakPerSecond(times, origin) {
   }
   return Math.max(0, ...buckets.values());
 }
+export function rollingPeak(times, windowMs = 1000) {
+  if (!Number.isFinite(windowMs) || windowMs <= 0) throw new Error('windowMs must be positive and finite');
+  const sorted = numeric(times).sort((a, b) => a - b);
+  let left = 0, peak = 0;
+  for (let right = 0; right < sorted.length; right++) {
+    while (sorted[right] - sorted[left] >= windowMs) left++;
+    peak = Math.max(peak, right - left + 1);
+  }
+  return peak;
+}
+export function reconnectRollingPeaks(bots, outageAt, listenAt) {
+  if (!Array.isArray(bots) || !Number.isFinite(outageAt) || !Number.isFinite(listenAt)) {
+    throw new Error('Reconnect rolling peaks require bots, outage_at and listen_at');
+  }
+  if (bots.some(bot => !Array.isArray(bot.attempts) || !Array.isArray(bot.opens))) {
+    throw new Error('Reconnect bot logs require attempts and opens arrays');
+  }
+  return {
+    peak_attempts_rolling_1s: rollingPeak(bots.flatMap(bot => bot.attempts).filter(t => t >= outageAt)),
+    peak_opens_rolling_1s: rollingPeak(bots.flatMap(bot => bot.opens).filter(t => t >= listenAt)),
+  };
+}
 export function stddev(values) {
   const a = numeric(values);
   if (!a.length) return null;
@@ -110,11 +132,12 @@ export function countMarkers(text, markers) {
 }
 // The first sample that demonstrates >=0.2s advancement from a playing sample.
 export function firstPlayback(samples, t0, audible = false) {
-  let start = null;
+  let start = null, previous = null;
   for (const s of samples) {
     if (s.t < t0) continue;
-    if (!playing(s) || (audible && (s.muted || !(s.volume > 0)))) { start = null; continue; }
-    if (!start || s.ct < start.ct) start = s;
+    if (!playing(s) || (audible && (s.muted || !(s.volume > 0)))) { start = null; previous = null; continue; }
+    if (!start || (previous && (s.ct < previous.ct || s.ct - previous.ct > 2 * (s.t - previous.t) / 1000 + 0.05))) start = s;
+    previous = s;
     if (s.ct - start.ct >= 0.2) return s.t - t0;
   }
   return null;

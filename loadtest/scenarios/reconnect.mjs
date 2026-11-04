@@ -3,7 +3,7 @@ import { guest } from '../lib/database.mjs';
 import { socketURL } from '../lib/socket.mjs';
 import { sleep, until } from '../lib/common.mjs';
 import { MAX_ATTEMPTS, reconnectDelay } from '../lib/reconnect-policy.mjs';
-import { peakPerSecond, stddev, browserReconnectState } from '../lib/stats.mjs';
+import { peakPerSecond, stddev, browserReconnectState, reconnectRollingPeaks } from '../lib/stats.mjs';
 
 export async function run(ctx) {
   return ctx.condition === 'browser-10' ? browserRun(ctx) : botRun(ctx);
@@ -72,6 +72,7 @@ async function botRun({ cleanup, result, seed, smoke, condition, restart, botCou
   return {
     peak_attempts_per_s: peakPerSecond(attempts, outageAt),
     peak_opens_per_s: peakPerSecond(opens, listenAt),
+    ...reconnectRollingPeaks(traces, outageAt, listenAt),
     time_to_all_reconnected_ms: reconnected.length === count
       ? Math.max(...reconnected.map(b => b.trace.opens.find(t => t >= listenAt))) - listenAt : null,
     reconnected: reconnected.length, gave_up: bots.filter(b => b.trace.gave_up_at !== null).length,

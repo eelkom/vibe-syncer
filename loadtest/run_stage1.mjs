@@ -46,6 +46,7 @@ try {
     const result = { scenario, commit: sha, commit_full: execFileSync('git', ['rev-parse', sha], { cwd: REPO, encoding: 'utf8' }).trim(),
       server_commit: serverSha, condition, run: runNumber, started_at: new Date().toISOString(),
       measurement_pool_size: measurementPoolSize,
+      server_forced_kills: 0,
       environment: path.relative(ROOT, envPath), smoke: opts.smoke, metrics: {},
       blocked_external_requests: 0, errors: [], ok: false };
     const cleanup = [];
@@ -65,7 +66,7 @@ try {
       }
       const restart = async () => {
         if (server.child.exitCode !== null || server.child.signalCode !== null) throw new Error('Server exited before planned SIGTERM');
-        await server.stop();
+        if ((await server.stop()).forced) result.server_forced_kills++;
         const exitedAt = Date.now();
         result.server_restart = { exited_at: exitedAt, fixed_wait_ms: 3000 };
         await sleep(3000);
@@ -84,10 +85,13 @@ try {
       for (const fn of cleanup.reverse()) {
         try { await fn(); } catch (error) { result.errors.push(`cleanup: ${error.stack ?? error}`); result.ok = false; process.exitCode = 1; }
       }
-      try { if (server) await server.stop(); }
+      try { if (server && (await server.stop()).forced) result.server_forced_kills++; }
       catch (error) { result.errors.push(`server stop: ${error.stack ?? error}`); result.ok = false; process.exitCode = 1; }
       try { if (created) await dropDatabase(database); }
       catch (error) { result.errors.push(`DB cleanup: ${error.stack ?? error}`); result.ok = false; process.exitCode = 1; }
+      // Keep duplicate browser traces only for failed rounds, including failures
+      // in server/DB cleanup after the scenario itself completed.
+      if (result.ok) delete result.browser_artifacts;
       result.finished_at = new Date().toISOString();
       await writeFile(target, JSON.stringify(result, null, 2) + '\n', { flag: opts.force ? 'w' : 'wx' });
       console.log(`${result.ok ? 'OK' : 'FAILED'} ${path.relative(ROOT, target)}`);

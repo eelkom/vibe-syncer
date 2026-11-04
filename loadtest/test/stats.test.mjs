@@ -151,7 +151,7 @@ test('summarize counts explicit ineffective injections and retains null counters
     metrics: { injection_effective: v, blocked_play_calls: v === false ? 0 : null } }));
   const group = summarizeRuns(runs)[0];
   assert.equal(group.injection_ineffective, 1);
-  assert.deepEqual(group.metrics.blocked_play_calls, { median: 0, p75: 0, p95: 0, valid: 1, missing: 3 });
+  assert.deepEqual(group.metrics.blocked_play_calls, { median: null, p75: null, p95: null, valid: 0, missing: 3 });
   assert.match(markdown([group]), /주입 무효 회차/);
   assert.match(markdown([group]), /autoplay\/abc\/all-blocked \| 4 \| 0 \| 0 \| 1/);
 });
@@ -208,5 +208,10 @@ test('plan uses fixed commits, smoke size and independent browser run default', 
   assert.equal(jobs.filter(j => j.condition === 'browser-10').length, 6);
   assert.ok(jobs.filter(j => j.condition !== 'browser-10').every(j => j.serverSha === 'b86324b'));
   assert.equal(plan(parseArgs(['--scenario', 'message_burst', '--smoke'])).length, 2);
-  assert.equal(plan(parseArgs(['--scenario', 'autoplay', '--smoke', '--runs', '100'])).length, 6);
+  const autoplay = plan(parseArgs(['--scenario', 'autoplay', '--smoke', '--runs', '100']));
+  assert.equal(autoplay.length, 9);
+  for (const condition of ['muted-allowed', 'all-blocked', 'silent-blocked']) {
+    assert.deepEqual(autoplay.filter(job => job.condition === condition).map(job => job.sha), ['ea2acea', 'a086001', 'b86324b']);
+    assert.ok(autoplay.filter(job => job.condition === condition).every(job => job.runNumber === 1));
+  }
 });

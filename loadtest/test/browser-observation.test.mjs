@@ -30,11 +30,11 @@ test('scripted user waits 1000ms, uses latest console coordinates, and never eva
   assert.deepEqual(errors, []);
 });
 
-async function instrumentation() {
+async function instrumentation(condition = 'muted-allowed') {
   let init, args;
   const page = new EventEmitter();
   const context = { async addInitScript(fn, data) { init = fn; args = data; }, async newPage() { return page; } };
-  await tab({ async newContext() { return context; } }, { nickname: 'observer' }, { errors: [] }, []);
+  await tab({ async newContext() { return context; } }, { nickname: 'observer' }, { errors: [] }, [], condition);
   const timers = [], messages = [];
   class NativeWebSocket extends EventTarget {
     static CONNECTING = 0; static OPEN = 1; static CLOSING = 2; static CLOSED = 3;
@@ -43,12 +43,20 @@ async function instrumentation() {
   const window = { WebSocket: NativeWebSocket };
   const document = { addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; } };
   const navigator = { userActivation: { hasBeenActive: false } };
-  const sandbox = { window, document, navigator, sessionStorage: { setItem() {} },
+  class Element {
+    setAttribute(name, value) { this.attributes ??= {}; this.attributes[name] = value; }
+  }
+  class HTMLMediaElement extends Element {
+    play() { this.nativePlayCalls = (this.nativePlayCalls ?? 0) + 1; return Promise.resolve('native playback'); }
+    get autoplay() { return this.autoplayValue ?? false; }
+    set autoplay(value) { this.autoplayValue = value; }
+  }
+  const sandbox = { window, document, navigator, Element, HTMLMediaElement, DOMException, sessionStorage: { setItem() {} },
     getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
     setInterval(fn, delay) { timers.push({ fn, delay }); },
     console: { debug(...values) { messages.push(values); } } };
   vm.runInNewContext(`(${init.toString()})(${JSON.stringify(args)})`, sandbox);
-  return { window, document, navigator, timers, messages, NativeWebSocket };
+  return { window, document, navigator, timers, messages, NativeWebSocket, HTMLMediaElement };
 }
 
 test('WebSocket instrumentation preserves native construction, constants and instanceof, and logs failed attempts', async () => {
@@ -75,6 +83,55 @@ test('WebSocket instrumentation preserves native construction, constants and ins
   assert.ok(window.__wsLog[1].open_at >= window.__wsLog[1].created_at);
   assert.throws(() => Wrapped('ws://127.0.0.1'), /class constructor|without 'new'/i);
   assert.equal(window.__wsLog.length, 2);
+});
+
+test('all-blocked still rejects immediately and blocks both autoplay paths before activation', async () => {
+  const { window, navigator, HTMLMediaElement } = await instrumentation('all-blocked');
+  const media = new HTMLMediaElement();
+  await assert.rejects(media.play(), { name: 'NotAllowedError' });
+  media.setAttribute('autoplay', ''); media.autoplay = true;
+  assert.equal(media.nativePlayCalls ?? 0, 0);
+  assert.equal(media.attributes?.autoplay, undefined);
+  assert.equal(media.autoplay, false);
+  assert.equal(window.__blockedPlay, 3);
+  navigator.userActivation.hasBeenActive = true;
+  assert.equal(await media.play(), 'native playback');
+  media.setAttribute('autoplay', ''); media.autoplay = true;
+  assert.equal(media.nativePlayCalls, 1);
+  assert.equal(media.attributes.autoplay, '');
+  assert.equal(media.autoplay, true);
+  assert.equal(window.__blockedPlay, 3);
+});
+test('silent-blocked leaves play pending without starting playback and resumes native calls only after activation', async () => {
+  const { window, navigator, HTMLMediaElement } = await instrumentation('silent-blocked');
+  const media = new HTMLMediaElement();
+  let settled = false;
+  media.play().then(() => { settled = true; }, () => { settled = true; });
+  media.setAttribute('autoplay', ''); media.autoplay = true;
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(settled, false);
+  assert.equal(media.nativePlayCalls ?? 0, 0);
+  assert.equal(media.autoplay, false);
+  assert.equal(media.attributes?.autoplay, undefined);
+  assert.equal(window.__blockedPlay, 3);
+  navigator.userActivation.hasBeenActive = true;
+  await Promise.resolve();
+  assert.equal(media.nativePlayCalls ?? 0, 0); // The instrument does not issue play itself.
+  assert.equal(await media.play(), 'native playback');
+  media.setAttribute('autoplay', ''); media.autoplay = true;
+  assert.equal(media.nativePlayCalls, 1);
+  assert.equal(media.autoplay, true);
+  assert.equal(media.attributes.autoplay, '');
+  assert.equal(settled, false);
+  assert.equal(window.__blockedPlay, 3);
+});
+test('muted-allowed does not inject play or autoplay blocking', async () => {
+  const { window, HTMLMediaElement } = await instrumentation();
+  const media = new HTMLMediaElement();
+  assert.equal(await media.play(), 'native playback');
+  media.autoplay = true;
+  assert.equal(media.autoplay, true);
+  assert.equal(window.__blockedPlay, 0);
 });
 
 test('page timers emit only changed button coordinates and sample activation even without media', async () => {
