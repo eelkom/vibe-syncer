@@ -1,0 +1,2376 @@
+{
+  "scenario": "message_burst",
+  "commit": "b86324b",
+  "commit_full": "b86324b85da447064ba42a9779101706dec16f8c",
+  "server_commit": "b86324b",
+  "condition": "50",
+  "run": 2,
+  "started_at": "2026-11-04T08:47:57.576Z",
+  "environment": "results/stage1/env-2026-11-04T08-31-18.999Z.json",
+  "smoke": false,
+  "metrics": {
+    "n": 50,
+    "control_received": 50,
+    "on_screen_unique": 50,
+    "delivery_ratio": 1,
+    "missing": [],
+    "duplicates": 0,
+    "elapsed_ms": 3143,
+    "raw": {
+      "start": 1793782079701,
+      "control_frames": [
+        {
+          "t": 1793782079702,
+          "data": {
+            "type": "system",
+            "message": "host has joined the room."
+          }
+        },
+        {
+          "t": 1793782079704,
+          "data": {
+            "type": "chat",
+            "id": 3,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:47:59.700914+00:00"
+          }
+        },
+        {
+          "t": 1793782079706,
+          "data": {
+            "type": "chat",
+            "id": 4,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-1",
+            "created_at": "2026-11-04T08:47:59.698299+00:00"
+          }
+        },
+        {
+          "t": 1793782079708,
+          "data": {
+            "type": "chat",
+            "id": 5,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-2",
+            "created_at": "2026-11-04T08:47:59.706019+00:00"
+          }
+        },
+        {
+          "t": 1793782079711,
+          "data": {
+            "type": "chat",
+            "id": 6,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-3",
+            "created_at": "2026-11-04T08:47:59.707709+00:00"
+          }
+        },
+        {
+          "t": 1793782079713,
+          "data": {
+            "type": "chat",
+            "id": 7,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-4",
+            "created_at": "2026-11-04T08:47:59.709995+00:00"
+          }
+        },
+        {
+          "t": 1793782079715,
+          "data": {
+            "type": "chat",
+            "id": 8,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-5",
+            "created_at": "2026-11-04T08:47:59.712656+00:00"
+          }
+        },
+        {
+          "t": 1793782079716,
+          "data": {
+            "type": "chat",
+            "id": 9,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-6",
+            "created_at": "2026-11-04T08:47:59.714414+00:00"
+          }
+        },
+        {
+          "t": 1793782079718,
+          "data": {
+            "type": "chat",
+            "id": 10,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-7",
+            "created_at": "2026-11-04T08:47:59.715992+00:00"
+          }
+        },
+        {
+          "t": 1793782079719,
+          "data": {
+            "type": "chat",
+            "id": 11,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-8",
+            "created_at": "2026-11-04T08:47:59.717641+00:00"
+          }
+        },
+        {
+          "t": 1793782079721,
+          "data": {
+            "type": "chat",
+            "id": 12,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-9",
+            "created_at": "2026-11-04T08:47:59.718947+00:00"
+          }
+        },
+        {
+          "t": 1793782079722,
+          "data": {
+            "type": "chat",
+            "id": 13,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-10",
+            "created_at": "2026-11-04T08:47:59.720635+00:00"
+          }
+        },
+        {
+          "t": 1793782079724,
+          "data": {
+            "type": "chat",
+            "id": 14,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-11",
+            "created_at": "2026-11-04T08:47:59.722136+00:00"
+          }
+        },
+        {
+          "t": 1793782079727,
+          "data": {
+            "type": "chat",
+            "id": 15,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-12",
+            "created_at": "2026-11-04T08:47:59.723816+00:00"
+          }
+        },
+        {
+          "t": 1793782079729,
+          "data": {
+            "type": "chat",
+            "id": 16,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-13",
+            "created_at": "2026-11-04T08:47:59.725310+00:00"
+          }
+        },
+        {
+          "t": 1793782079731,
+          "data": {
+            "type": "chat",
+            "id": 17,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-14",
+            "created_at": "2026-11-04T08:47:59.728966+00:00"
+          }
+        },
+        {
+          "t": 1793782079733,
+          "data": {
+            "type": "chat",
+            "id": 18,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-15",
+            "created_at": "2026-11-04T08:47:59.730903+00:00"
+          }
+        },
+        {
+          "t": 1793782079735,
+          "data": {
+            "type": "chat",
+            "id": 19,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-16",
+            "created_at": "2026-11-04T08:47:59.732708+00:00"
+          }
+        },
+        {
+          "t": 1793782079737,
+          "data": {
+            "type": "chat",
+            "id": 20,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-17",
+            "created_at": "2026-11-04T08:47:59.734096+00:00"
+          }
+        },
+        {
+          "t": 1793782079738,
+          "data": {
+            "type": "chat",
+            "id": 21,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-18",
+            "created_at": "2026-11-04T08:47:59.736326+00:00"
+          }
+        },
+        {
+          "t": 1793782079739,
+          "data": {
+            "type": "chat",
+            "id": 22,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-19",
+            "created_at": "2026-11-04T08:47:59.737908+00:00"
+          }
+        },
+        {
+          "t": 1793782079742,
+          "data": {
+            "type": "chat",
+            "id": 23,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-20",
+            "created_at": "2026-11-04T08:47:59.739315+00:00"
+          }
+        },
+        {
+          "t": 1793782079743,
+          "data": {
+            "type": "chat",
+            "id": 24,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-21",
+            "created_at": "2026-11-04T08:47:59.741027+00:00"
+          }
+        },
+        {
+          "t": 1793782079746,
+          "data": {
+            "type": "chat",
+            "id": 25,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-22",
+            "created_at": "2026-11-04T08:47:59.743202+00:00"
+          }
+        },
+        {
+          "t": 1793782079747,
+          "data": {
+            "type": "chat",
+            "id": 26,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-23",
+            "created_at": "2026-11-04T08:47:59.745412+00:00"
+          }
+        },
+        {
+          "t": 1793782079748,
+          "data": {
+            "type": "chat",
+            "id": 27,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-24",
+            "created_at": "2026-11-04T08:47:59.747010+00:00"
+          }
+        },
+        {
+          "t": 1793782079750,
+          "data": {
+            "type": "chat",
+            "id": 28,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-25",
+            "created_at": "2026-11-04T08:47:59.748313+00:00"
+          }
+        },
+        {
+          "t": 1793782079751,
+          "data": {
+            "type": "chat",
+            "id": 29,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-26",
+            "created_at": "2026-11-04T08:47:59.749662+00:00"
+          }
+        },
+        {
+          "t": 1793782079752,
+          "data": {
+            "type": "chat",
+            "id": 30,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-27",
+            "created_at": "2026-11-04T08:47:59.750894+00:00"
+          }
+        },
+        {
+          "t": 1793782079755,
+          "data": {
+            "type": "chat",
+            "id": 31,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-28",
+            "created_at": "2026-11-04T08:47:59.752158+00:00"
+          }
+        },
+        {
+          "t": 1793782079758,
+          "data": {
+            "type": "chat",
+            "id": 32,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-29",
+            "created_at": "2026-11-04T08:47:59.754169+00:00"
+          }
+        },
+        {
+          "t": 1793782079760,
+          "data": {
+            "type": "chat",
+            "id": 33,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-30",
+            "created_at": "2026-11-04T08:47:59.756225+00:00"
+          }
+        },
+        {
+          "t": 1793782079762,
+          "data": {
+            "type": "chat",
+            "id": 34,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-31",
+            "created_at": "2026-11-04T08:47:59.758999+00:00"
+          }
+        },
+        {
+          "t": 1793782079764,
+          "data": {
+            "type": "chat",
+            "id": 35,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-32",
+            "created_at": "2026-11-04T08:47:59.761904+00:00"
+          }
+        },
+        {
+          "t": 1793782079766,
+          "data": {
+            "type": "chat",
+            "id": 36,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-33",
+            "created_at": "2026-11-04T08:47:59.763676+00:00"
+          }
+        },
+        {
+          "t": 1793782079767,
+          "data": {
+            "type": "chat",
+            "id": 37,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-34",
+            "created_at": "2026-11-04T08:47:59.765546+00:00"
+          }
+        },
+        {
+          "t": 1793782079769,
+          "data": {
+            "type": "chat",
+            "id": 38,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-35",
+            "created_at": "2026-11-04T08:47:59.766795+00:00"
+          }
+        },
+        {
+          "t": 1793782079771,
+          "data": {
+            "type": "chat",
+            "id": 39,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-36",
+            "created_at": "2026-11-04T08:47:59.768404+00:00"
+          }
+        },
+        {
+          "t": 1793782079772,
+          "data": {
+            "type": "chat",
+            "id": 40,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-37",
+            "created_at": "2026-11-04T08:47:59.770031+00:00"
+          }
+        },
+        {
+          "t": 1793782079773,
+          "data": {
+            "type": "chat",
+            "id": 41,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-38",
+            "created_at": "2026-11-04T08:47:59.771775+00:00"
+          }
+        },
+        {
+          "t": 1793782079775,
+          "data": {
+            "type": "chat",
+            "id": 42,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-39",
+            "created_at": "2026-11-04T08:47:59.773402+00:00"
+          }
+        },
+        {
+          "t": 1793782079779,
+          "data": {
+            "type": "chat",
+            "id": 43,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-40",
+            "created_at": "2026-11-04T08:47:59.774390+00:00"
+          }
+        },
+        {
+          "t": 1793782079781,
+          "data": {
+            "type": "chat",
+            "id": 44,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-41",
+            "created_at": "2026-11-04T08:47:59.777126+00:00"
+          }
+        },
+        {
+          "t": 1793782079782,
+          "data": {
+            "type": "chat",
+            "id": 45,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-42",
+            "created_at": "2026-11-04T08:47:59.781156+00:00"
+          }
+        },
+        {
+          "t": 1793782079784,
+          "data": {
+            "type": "chat",
+            "id": 46,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-43",
+            "created_at": "2026-11-04T08:47:59.782465+00:00"
+          }
+        },
+        {
+          "t": 1793782079785,
+          "data": {
+            "type": "chat",
+            "id": 47,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-44",
+            "created_at": "2026-11-04T08:47:59.783905+00:00"
+          }
+        },
+        {
+          "t": 1793782079786,
+          "data": {
+            "type": "chat",
+            "id": 48,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-45",
+            "created_at": "2026-11-04T08:47:59.785185+00:00"
+          }
+        },
+        {
+          "t": 1793782079788,
+          "data": {
+            "type": "chat",
+            "id": 49,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-46",
+            "created_at": "2026-11-04T08:47:59.786147+00:00"
+          }
+        },
+        {
+          "t": 1793782079789,
+          "data": {
+            "type": "chat",
+            "id": 50,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-47",
+            "created_at": "2026-11-04T08:47:59.787818+00:00"
+          }
+        },
+        {
+          "t": 1793782079791,
+          "data": {
+            "type": "chat",
+            "id": 51,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-48",
+            "created_at": "2026-11-04T08:47:59.789238+00:00"
+          }
+        },
+        {
+          "t": 1793782079793,
+          "data": {
+            "type": "chat",
+            "id": 52,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-49",
+            "created_at": "2026-11-04T08:47:59.790539+00:00"
+          }
+        },
+        {
+          "t": 1793782079794,
+          "data": {
+            "type": "chat",
+            "id": 53,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-50",
+            "created_at": "2026-11-04T08:47:59.792315+00:00"
+          }
+        }
+      ],
+      "observer_frames": [
+        {
+          "t": 1793782079638,
+          "data": {
+            "type": "system",
+            "message": "observer has joined the room."
+          }
+        },
+        {
+          "t": 1793782079638,
+          "data": {
+            "type": "chat",
+            "id": 1,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:47:59.626837+00:00"
+          }
+        },
+        {
+          "t": 1793782079696,
+          "data": {
+            "type": "system",
+            "message": "sender has joined the room."
+          }
+        },
+        {
+          "t": 1793782079699,
+          "data": {
+            "type": "chat",
+            "id": 2,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:47:59.695600+00:00"
+          }
+        },
+        {
+          "t": 1793782079702,
+          "data": {
+            "type": "system",
+            "message": "host has joined the room."
+          }
+        },
+        {
+          "t": 1793782079704,
+          "data": {
+            "type": "chat",
+            "id": 3,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:47:59.700914+00:00"
+          }
+        },
+        {
+          "t": 1793782079706,
+          "data": {
+            "type": "chat",
+            "id": 4,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-1",
+            "created_at": "2026-11-04T08:47:59.698299+00:00"
+          }
+        },
+        {
+          "t": 1793782079708,
+          "data": {
+            "type": "chat",
+            "id": 5,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-2",
+            "created_at": "2026-11-04T08:47:59.706019+00:00"
+          }
+        },
+        {
+          "t": 1793782079711,
+          "data": {
+            "type": "chat",
+            "id": 6,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-3",
+            "created_at": "2026-11-04T08:47:59.707709+00:00"
+          }
+        },
+        {
+          "t": 1793782079713,
+          "data": {
+            "type": "chat",
+            "id": 7,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-4",
+            "created_at": "2026-11-04T08:47:59.709995+00:00"
+          }
+        },
+        {
+          "t": 1793782079714,
+          "data": {
+            "type": "chat",
+            "id": 8,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-5",
+            "created_at": "2026-11-04T08:47:59.712656+00:00"
+          }
+        },
+        {
+          "t": 1793782079716,
+          "data": {
+            "type": "chat",
+            "id": 9,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-6",
+            "created_at": "2026-11-04T08:47:59.714414+00:00"
+          }
+        },
+        {
+          "t": 1793782079718,
+          "data": {
+            "type": "chat",
+            "id": 10,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-7",
+            "created_at": "2026-11-04T08:47:59.715992+00:00"
+          }
+        },
+        {
+          "t": 1793782079719,
+          "data": {
+            "type": "chat",
+            "id": 11,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-8",
+            "created_at": "2026-11-04T08:47:59.717641+00:00"
+          }
+        },
+        {
+          "t": 1793782079720,
+          "data": {
+            "type": "chat",
+            "id": 12,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-9",
+            "created_at": "2026-11-04T08:47:59.718947+00:00"
+          }
+        },
+        {
+          "t": 1793782079722,
+          "data": {
+            "type": "chat",
+            "id": 13,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-10",
+            "created_at": "2026-11-04T08:47:59.720635+00:00"
+          }
+        },
+        {
+          "t": 1793782079724,
+          "data": {
+            "type": "chat",
+            "id": 14,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-11",
+            "created_at": "2026-11-04T08:47:59.722136+00:00"
+          }
+        },
+        {
+          "t": 1793782079726,
+          "data": {
+            "type": "chat",
+            "id": 15,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-12",
+            "created_at": "2026-11-04T08:47:59.723816+00:00"
+          }
+        },
+        {
+          "t": 1793782079730,
+          "data": {
+            "type": "chat",
+            "id": 16,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-13",
+            "created_at": "2026-11-04T08:47:59.725310+00:00"
+          }
+        },
+        {
+          "t": 1793782079731,
+          "data": {
+            "type": "chat",
+            "id": 17,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-14",
+            "created_at": "2026-11-04T08:47:59.728966+00:00"
+          }
+        },
+        {
+          "t": 1793782079733,
+          "data": {
+            "type": "chat",
+            "id": 18,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-15",
+            "created_at": "2026-11-04T08:47:59.730903+00:00"
+          }
+        },
+        {
+          "t": 1793782079735,
+          "data": {
+            "type": "chat",
+            "id": 19,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-16",
+            "created_at": "2026-11-04T08:47:59.732708+00:00"
+          }
+        },
+        {
+          "t": 1793782079737,
+          "data": {
+            "type": "chat",
+            "id": 20,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-17",
+            "created_at": "2026-11-04T08:47:59.734096+00:00"
+          }
+        },
+        {
+          "t": 1793782079738,
+          "data": {
+            "type": "chat",
+            "id": 21,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-18",
+            "created_at": "2026-11-04T08:47:59.736326+00:00"
+          }
+        },
+        {
+          "t": 1793782079739,
+          "data": {
+            "type": "chat",
+            "id": 22,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-19",
+            "created_at": "2026-11-04T08:47:59.737908+00:00"
+          }
+        },
+        {
+          "t": 1793782079742,
+          "data": {
+            "type": "chat",
+            "id": 23,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-20",
+            "created_at": "2026-11-04T08:47:59.739315+00:00"
+          }
+        },
+        {
+          "t": 1793782079743,
+          "data": {
+            "type": "chat",
+            "id": 24,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-21",
+            "created_at": "2026-11-04T08:47:59.741027+00:00"
+          }
+        },
+        {
+          "t": 1793782079746,
+          "data": {
+            "type": "chat",
+            "id": 25,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-22",
+            "created_at": "2026-11-04T08:47:59.743202+00:00"
+          }
+        },
+        {
+          "t": 1793782079747,
+          "data": {
+            "type": "chat",
+            "id": 26,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-23",
+            "created_at": "2026-11-04T08:47:59.745412+00:00"
+          }
+        },
+        {
+          "t": 1793782079748,
+          "data": {
+            "type": "chat",
+            "id": 27,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-24",
+            "created_at": "2026-11-04T08:47:59.747010+00:00"
+          }
+        },
+        {
+          "t": 1793782079750,
+          "data": {
+            "type": "chat",
+            "id": 28,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-25",
+            "created_at": "2026-11-04T08:47:59.748313+00:00"
+          }
+        },
+        {
+          "t": 1793782079751,
+          "data": {
+            "type": "chat",
+            "id": 29,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-26",
+            "created_at": "2026-11-04T08:47:59.749662+00:00"
+          }
+        },
+        {
+          "t": 1793782079752,
+          "data": {
+            "type": "chat",
+            "id": 30,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-27",
+            "created_at": "2026-11-04T08:47:59.750894+00:00"
+          }
+        },
+        {
+          "t": 1793782079754,
+          "data": {
+            "type": "chat",
+            "id": 31,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-28",
+            "created_at": "2026-11-04T08:47:59.752158+00:00"
+          }
+        },
+        {
+          "t": 1793782079758,
+          "data": {
+            "type": "chat",
+            "id": 32,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-29",
+            "created_at": "2026-11-04T08:47:59.754169+00:00"
+          }
+        },
+        {
+          "t": 1793782079760,
+          "data": {
+            "type": "chat",
+            "id": 33,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-30",
+            "created_at": "2026-11-04T08:47:59.756225+00:00"
+          }
+        },
+        {
+          "t": 1793782079762,
+          "data": {
+            "type": "chat",
+            "id": 34,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-31",
+            "created_at": "2026-11-04T08:47:59.758999+00:00"
+          }
+        },
+        {
+          "t": 1793782079764,
+          "data": {
+            "type": "chat",
+            "id": 35,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-32",
+            "created_at": "2026-11-04T08:47:59.761904+00:00"
+          }
+        },
+        {
+          "t": 1793782079766,
+          "data": {
+            "type": "chat",
+            "id": 36,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-33",
+            "created_at": "2026-11-04T08:47:59.763676+00:00"
+          }
+        },
+        {
+          "t": 1793782079767,
+          "data": {
+            "type": "chat",
+            "id": 37,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-34",
+            "created_at": "2026-11-04T08:47:59.765546+00:00"
+          }
+        },
+        {
+          "t": 1793782079769,
+          "data": {
+            "type": "chat",
+            "id": 38,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-35",
+            "created_at": "2026-11-04T08:47:59.766795+00:00"
+          }
+        },
+        {
+          "t": 1793782079771,
+          "data": {
+            "type": "chat",
+            "id": 39,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-36",
+            "created_at": "2026-11-04T08:47:59.768404+00:00"
+          }
+        },
+        {
+          "t": 1793782079772,
+          "data": {
+            "type": "chat",
+            "id": 40,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-37",
+            "created_at": "2026-11-04T08:47:59.770031+00:00"
+          }
+        },
+        {
+          "t": 1793782079773,
+          "data": {
+            "type": "chat",
+            "id": 41,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-38",
+            "created_at": "2026-11-04T08:47:59.771775+00:00"
+          }
+        },
+        {
+          "t": 1793782079775,
+          "data": {
+            "type": "chat",
+            "id": 42,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-39",
+            "created_at": "2026-11-04T08:47:59.773402+00:00"
+          }
+        },
+        {
+          "t": 1793782079779,
+          "data": {
+            "type": "chat",
+            "id": 43,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-40",
+            "created_at": "2026-11-04T08:47:59.774390+00:00"
+          }
+        },
+        {
+          "t": 1793782079781,
+          "data": {
+            "type": "chat",
+            "id": 44,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-41",
+            "created_at": "2026-11-04T08:47:59.777126+00:00"
+          }
+        },
+        {
+          "t": 1793782079782,
+          "data": {
+            "type": "chat",
+            "id": 45,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-42",
+            "created_at": "2026-11-04T08:47:59.781156+00:00"
+          }
+        },
+        {
+          "t": 1793782079784,
+          "data": {
+            "type": "chat",
+            "id": 46,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-43",
+            "created_at": "2026-11-04T08:47:59.782465+00:00"
+          }
+        },
+        {
+          "t": 1793782079785,
+          "data": {
+            "type": "chat",
+            "id": 47,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-44",
+            "created_at": "2026-11-04T08:47:59.783905+00:00"
+          }
+        },
+        {
+          "t": 1793782079786,
+          "data": {
+            "type": "chat",
+            "id": 48,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-45",
+            "created_at": "2026-11-04T08:47:59.785185+00:00"
+          }
+        },
+        {
+          "t": 1793782079788,
+          "data": {
+            "type": "chat",
+            "id": 49,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-46",
+            "created_at": "2026-11-04T08:47:59.786147+00:00"
+          }
+        },
+        {
+          "t": 1793782079789,
+          "data": {
+            "type": "chat",
+            "id": 50,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-47",
+            "created_at": "2026-11-04T08:47:59.787818+00:00"
+          }
+        },
+        {
+          "t": 1793782079791,
+          "data": {
+            "type": "chat",
+            "id": 51,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-48",
+            "created_at": "2026-11-04T08:47:59.789238+00:00"
+          }
+        },
+        {
+          "t": 1793782079792,
+          "data": {
+            "type": "chat",
+            "id": 52,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-49",
+            "created_at": "2026-11-04T08:47:59.790539+00:00"
+          }
+        },
+        {
+          "t": 1793782079794,
+          "data": {
+            "type": "chat",
+            "id": 53,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-50",
+            "created_at": "2026-11-04T08:47:59.792315+00:00"
+          }
+        }
+      ],
+      "text": "🤖 VibeBot\n\nStage1 fixed welcome.\n\nsender\n\nm-2-1\n\nsender\n\nm-2-2\n\nsender\n\nm-2-3\n\nsender\n\nm-2-4\n\nsender\n\nm-2-5\n\nsender\n\nm-2-6\n\nsender\n\nm-2-7\n\nsender\n\nm-2-8\n\nsender\n\nm-2-9\n\nsender\n\nm-2-10\n\nsender\n\nm-2-11\n\nsender\n\nm-2-12\n\nsender\n\nm-2-13\n\nsender\n\nm-2-14\n\nsender\n\nm-2-15\n\nsender\n\nm-2-16\n\nsender\n\nm-2-17\n\nsender\n\nm-2-18\n\nsender\n\nm-2-19\n\nsender\n\nm-2-20\n\nsender\n\nm-2-21\n\nsender\n\nm-2-22\n\nsender\n\nm-2-23\n\nsender\n\nm-2-24\n\nsender\n\nm-2-25\n\nsender\n\nm-2-26\n\nsender\n\nm-2-27\n\nsender\n\nm-2-28\n\nsender\n\nm-2-29\n\nsender\n\nm-2-30\n\nsender\n\nm-2-31\n\nsender\n\nm-2-32\n\nsender\n\nm-2-33\n\nsender\n\nm-2-34\n\nsender\n\nm-2-35\n\nsender\n\nm-2-36\n\nsender\n\nm-2-37\n\nsender\n\nm-2-38\n\nsender\n\nm-2-39\n\nsender\n\nm-2-40\n\nsender\n\nm-2-41\n\nsender\n\nm-2-42\n\nsender\n\nm-2-43\n\nsender\n\nm-2-44\n\nsender\n\nm-2-45\n\nsender\n\nm-2-46\n\nsender\n\nm-2-47\n\nsender\n\nm-2-48\n\nsender\n\nm-2-49\n\nsender\n\nm-2-50",
+      "counts": {
+        "m-2-1": 1,
+        "m-2-2": 1,
+        "m-2-3": 1,
+        "m-2-4": 1,
+        "m-2-5": 1,
+        "m-2-6": 1,
+        "m-2-7": 1,
+        "m-2-8": 1,
+        "m-2-9": 1,
+        "m-2-10": 1,
+        "m-2-11": 1,
+        "m-2-12": 1,
+        "m-2-13": 1,
+        "m-2-14": 1,
+        "m-2-15": 1,
+        "m-2-16": 1,
+        "m-2-17": 1,
+        "m-2-18": 1,
+        "m-2-19": 1,
+        "m-2-20": 1,
+        "m-2-21": 1,
+        "m-2-22": 1,
+        "m-2-23": 1,
+        "m-2-24": 1,
+        "m-2-25": 1,
+        "m-2-26": 1,
+        "m-2-27": 1,
+        "m-2-28": 1,
+        "m-2-29": 1,
+        "m-2-30": 1,
+        "m-2-31": 1,
+        "m-2-32": 1,
+        "m-2-33": 1,
+        "m-2-34": 1,
+        "m-2-35": 1,
+        "m-2-36": 1,
+        "m-2-37": 1,
+        "m-2-38": 1,
+        "m-2-39": 1,
+        "m-2-40": 1,
+        "m-2-41": 1,
+        "m-2-42": 1,
+        "m-2-43": 1,
+        "m-2-44": 1,
+        "m-2-45": 1,
+        "m-2-46": 1,
+        "m-2-47": 1,
+        "m-2-48": 1,
+        "m-2-49": 1,
+        "m-2-50": 1
+      },
+      "clicks": [
+        {
+          "kind": "unmute",
+          "first_seen": 1793782079789,
+          "attempted_at": 1793782080790,
+          "x": 640.0078125,
+          "y": 699.5,
+          "t": 1793782080792,
+          "ok": true,
+          "input_finished_at": 1793782080801
+        }
+      ]
+    }
+  },
+  "blocked_external_requests": 0,
+  "errors": [],
+  "ok": true,
+  "server_logs": [
+    ".logs/server-loadtest_message_burst_b86324b_2-3975.log"
+  ],
+  "browser_artifacts": [
+    {
+      "role": "observer",
+      "samples": [
+        {
+          "t": 1793782079641,
+          "none": true,
+          "act": true
+        },
+        {
+          "t": 1793782079739,
+          "none": true,
+          "act": true
+        },
+        {
+          "t": 1793782079841,
+          "none": true,
+          "act": true
+        },
+        {
+          "t": 1793782079939,
+          "none": true,
+          "act": true
+        },
+        {
+          "t": 1793782080041,
+          "ct": 0.029167,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080140,
+          "ct": 0.128586,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080240,
+          "ct": 0.230612,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080340,
+          "ct": 0.330094,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080441,
+          "ct": 0.432818,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080540,
+          "ct": 0.528984,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080639,
+          "ct": 0.627297,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080740,
+          "ct": 0.731005,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080840,
+          "ct": 0.872,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782080940,
+          "ct": 0.88443,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081039,
+          "ct": 0.986902,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081141,
+          "ct": 1.089668,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081240,
+          "ct": 1.192526,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081340,
+          "ct": 1.284941,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081440,
+          "ct": 1.386157,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081540,
+          "ct": 1.48942,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081640,
+          "ct": 1.592389,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081740,
+          "ct": 1.693657,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081840,
+          "ct": 1.78611,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782081940,
+          "ct": 1.889159,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082040,
+          "ct": 1.990351,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082140,
+          "ct": 2.093564,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082240,
+          "ct": 2.186051,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082341,
+          "ct": 2.289604,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082441,
+          "ct": 2.390771,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082540,
+          "ct": 2.493455,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082639,
+          "ct": 2.584771,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082740,
+          "ct": 2.686402,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782082840,
+          "ct": 2.790297,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        }
+      ],
+      "user_click_events": [
+        {
+          "kind": "unmute",
+          "t": 1793782080792
+        }
+      ],
+      "ws_log": [
+        {
+          "created_at": 1793782079620,
+          "open_at": 1793782079634,
+          "close_at": null,
+          "code": null
+        }
+      ],
+      "blocked_play_calls": 0,
+      "frames": [
+        {
+          "t": 1793782079638,
+          "data": {
+            "type": "system",
+            "message": "observer has joined the room."
+          }
+        },
+        {
+          "t": 1793782079638,
+          "data": {
+            "type": "chat",
+            "id": 1,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:47:59.626837+00:00"
+          }
+        },
+        {
+          "t": 1793782079696,
+          "data": {
+            "type": "system",
+            "message": "sender has joined the room."
+          }
+        },
+        {
+          "t": 1793782079699,
+          "data": {
+            "type": "chat",
+            "id": 2,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:47:59.695600+00:00"
+          }
+        },
+        {
+          "t": 1793782079702,
+          "data": {
+            "type": "system",
+            "message": "host has joined the room."
+          }
+        },
+        {
+          "t": 1793782079704,
+          "data": {
+            "type": "chat",
+            "id": 3,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:47:59.700914+00:00"
+          }
+        },
+        {
+          "t": 1793782079706,
+          "data": {
+            "type": "chat",
+            "id": 4,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-1",
+            "created_at": "2026-11-04T08:47:59.698299+00:00"
+          }
+        },
+        {
+          "t": 1793782079708,
+          "data": {
+            "type": "chat",
+            "id": 5,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-2",
+            "created_at": "2026-11-04T08:47:59.706019+00:00"
+          }
+        },
+        {
+          "t": 1793782079711,
+          "data": {
+            "type": "chat",
+            "id": 6,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-3",
+            "created_at": "2026-11-04T08:47:59.707709+00:00"
+          }
+        },
+        {
+          "t": 1793782079713,
+          "data": {
+            "type": "chat",
+            "id": 7,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-4",
+            "created_at": "2026-11-04T08:47:59.709995+00:00"
+          }
+        },
+        {
+          "t": 1793782079714,
+          "data": {
+            "type": "chat",
+            "id": 8,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-5",
+            "created_at": "2026-11-04T08:47:59.712656+00:00"
+          }
+        },
+        {
+          "t": 1793782079716,
+          "data": {
+            "type": "chat",
+            "id": 9,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-6",
+            "created_at": "2026-11-04T08:47:59.714414+00:00"
+          }
+        },
+        {
+          "t": 1793782079718,
+          "data": {
+            "type": "chat",
+            "id": 10,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-7",
+            "created_at": "2026-11-04T08:47:59.715992+00:00"
+          }
+        },
+        {
+          "t": 1793782079719,
+          "data": {
+            "type": "chat",
+            "id": 11,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-8",
+            "created_at": "2026-11-04T08:47:59.717641+00:00"
+          }
+        },
+        {
+          "t": 1793782079720,
+          "data": {
+            "type": "chat",
+            "id": 12,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-9",
+            "created_at": "2026-11-04T08:47:59.718947+00:00"
+          }
+        },
+        {
+          "t": 1793782079722,
+          "data": {
+            "type": "chat",
+            "id": 13,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-10",
+            "created_at": "2026-11-04T08:47:59.720635+00:00"
+          }
+        },
+        {
+          "t": 1793782079724,
+          "data": {
+            "type": "chat",
+            "id": 14,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-11",
+            "created_at": "2026-11-04T08:47:59.722136+00:00"
+          }
+        },
+        {
+          "t": 1793782079726,
+          "data": {
+            "type": "chat",
+            "id": 15,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-12",
+            "created_at": "2026-11-04T08:47:59.723816+00:00"
+          }
+        },
+        {
+          "t": 1793782079730,
+          "data": {
+            "type": "chat",
+            "id": 16,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-13",
+            "created_at": "2026-11-04T08:47:59.725310+00:00"
+          }
+        },
+        {
+          "t": 1793782079731,
+          "data": {
+            "type": "chat",
+            "id": 17,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-14",
+            "created_at": "2026-11-04T08:47:59.728966+00:00"
+          }
+        },
+        {
+          "t": 1793782079733,
+          "data": {
+            "type": "chat",
+            "id": 18,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-15",
+            "created_at": "2026-11-04T08:47:59.730903+00:00"
+          }
+        },
+        {
+          "t": 1793782079735,
+          "data": {
+            "type": "chat",
+            "id": 19,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-16",
+            "created_at": "2026-11-04T08:47:59.732708+00:00"
+          }
+        },
+        {
+          "t": 1793782079737,
+          "data": {
+            "type": "chat",
+            "id": 20,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-17",
+            "created_at": "2026-11-04T08:47:59.734096+00:00"
+          }
+        },
+        {
+          "t": 1793782079738,
+          "data": {
+            "type": "chat",
+            "id": 21,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-18",
+            "created_at": "2026-11-04T08:47:59.736326+00:00"
+          }
+        },
+        {
+          "t": 1793782079739,
+          "data": {
+            "type": "chat",
+            "id": 22,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-19",
+            "created_at": "2026-11-04T08:47:59.737908+00:00"
+          }
+        },
+        {
+          "t": 1793782079742,
+          "data": {
+            "type": "chat",
+            "id": 23,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-20",
+            "created_at": "2026-11-04T08:47:59.739315+00:00"
+          }
+        },
+        {
+          "t": 1793782079743,
+          "data": {
+            "type": "chat",
+            "id": 24,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-21",
+            "created_at": "2026-11-04T08:47:59.741027+00:00"
+          }
+        },
+        {
+          "t": 1793782079746,
+          "data": {
+            "type": "chat",
+            "id": 25,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-22",
+            "created_at": "2026-11-04T08:47:59.743202+00:00"
+          }
+        },
+        {
+          "t": 1793782079747,
+          "data": {
+            "type": "chat",
+            "id": 26,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-23",
+            "created_at": "2026-11-04T08:47:59.745412+00:00"
+          }
+        },
+        {
+          "t": 1793782079748,
+          "data": {
+            "type": "chat",
+            "id": 27,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-24",
+            "created_at": "2026-11-04T08:47:59.747010+00:00"
+          }
+        },
+        {
+          "t": 1793782079750,
+          "data": {
+            "type": "chat",
+            "id": 28,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-25",
+            "created_at": "2026-11-04T08:47:59.748313+00:00"
+          }
+        },
+        {
+          "t": 1793782079751,
+          "data": {
+            "type": "chat",
+            "id": 29,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-26",
+            "created_at": "2026-11-04T08:47:59.749662+00:00"
+          }
+        },
+        {
+          "t": 1793782079752,
+          "data": {
+            "type": "chat",
+            "id": 30,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-27",
+            "created_at": "2026-11-04T08:47:59.750894+00:00"
+          }
+        },
+        {
+          "t": 1793782079754,
+          "data": {
+            "type": "chat",
+            "id": 31,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-28",
+            "created_at": "2026-11-04T08:47:59.752158+00:00"
+          }
+        },
+        {
+          "t": 1793782079758,
+          "data": {
+            "type": "chat",
+            "id": 32,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-29",
+            "created_at": "2026-11-04T08:47:59.754169+00:00"
+          }
+        },
+        {
+          "t": 1793782079760,
+          "data": {
+            "type": "chat",
+            "id": 33,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-30",
+            "created_at": "2026-11-04T08:47:59.756225+00:00"
+          }
+        },
+        {
+          "t": 1793782079762,
+          "data": {
+            "type": "chat",
+            "id": 34,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-31",
+            "created_at": "2026-11-04T08:47:59.758999+00:00"
+          }
+        },
+        {
+          "t": 1793782079764,
+          "data": {
+            "type": "chat",
+            "id": 35,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-32",
+            "created_at": "2026-11-04T08:47:59.761904+00:00"
+          }
+        },
+        {
+          "t": 1793782079766,
+          "data": {
+            "type": "chat",
+            "id": 36,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-33",
+            "created_at": "2026-11-04T08:47:59.763676+00:00"
+          }
+        },
+        {
+          "t": 1793782079767,
+          "data": {
+            "type": "chat",
+            "id": 37,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-34",
+            "created_at": "2026-11-04T08:47:59.765546+00:00"
+          }
+        },
+        {
+          "t": 1793782079769,
+          "data": {
+            "type": "chat",
+            "id": 38,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-35",
+            "created_at": "2026-11-04T08:47:59.766795+00:00"
+          }
+        },
+        {
+          "t": 1793782079771,
+          "data": {
+            "type": "chat",
+            "id": 39,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-36",
+            "created_at": "2026-11-04T08:47:59.768404+00:00"
+          }
+        },
+        {
+          "t": 1793782079772,
+          "data": {
+            "type": "chat",
+            "id": 40,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-37",
+            "created_at": "2026-11-04T08:47:59.770031+00:00"
+          }
+        },
+        {
+          "t": 1793782079773,
+          "data": {
+            "type": "chat",
+            "id": 41,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-38",
+            "created_at": "2026-11-04T08:47:59.771775+00:00"
+          }
+        },
+        {
+          "t": 1793782079775,
+          "data": {
+            "type": "chat",
+            "id": 42,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-39",
+            "created_at": "2026-11-04T08:47:59.773402+00:00"
+          }
+        },
+        {
+          "t": 1793782079779,
+          "data": {
+            "type": "chat",
+            "id": 43,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-40",
+            "created_at": "2026-11-04T08:47:59.774390+00:00"
+          }
+        },
+        {
+          "t": 1793782079781,
+          "data": {
+            "type": "chat",
+            "id": 44,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-41",
+            "created_at": "2026-11-04T08:47:59.777126+00:00"
+          }
+        },
+        {
+          "t": 1793782079782,
+          "data": {
+            "type": "chat",
+            "id": 45,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-42",
+            "created_at": "2026-11-04T08:47:59.781156+00:00"
+          }
+        },
+        {
+          "t": 1793782079784,
+          "data": {
+            "type": "chat",
+            "id": 46,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-43",
+            "created_at": "2026-11-04T08:47:59.782465+00:00"
+          }
+        },
+        {
+          "t": 1793782079785,
+          "data": {
+            "type": "chat",
+            "id": 47,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-44",
+            "created_at": "2026-11-04T08:47:59.783905+00:00"
+          }
+        },
+        {
+          "t": 1793782079786,
+          "data": {
+            "type": "chat",
+            "id": 48,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-45",
+            "created_at": "2026-11-04T08:47:59.785185+00:00"
+          }
+        },
+        {
+          "t": 1793782079788,
+          "data": {
+            "type": "chat",
+            "id": 49,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-46",
+            "created_at": "2026-11-04T08:47:59.786147+00:00"
+          }
+        },
+        {
+          "t": 1793782079789,
+          "data": {
+            "type": "chat",
+            "id": 50,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-47",
+            "created_at": "2026-11-04T08:47:59.787818+00:00"
+          }
+        },
+        {
+          "t": 1793782079791,
+          "data": {
+            "type": "chat",
+            "id": 51,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-48",
+            "created_at": "2026-11-04T08:47:59.789238+00:00"
+          }
+        },
+        {
+          "t": 1793782079792,
+          "data": {
+            "type": "chat",
+            "id": 52,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-49",
+            "created_at": "2026-11-04T08:47:59.790539+00:00"
+          }
+        },
+        {
+          "t": 1793782079794,
+          "data": {
+            "type": "chat",
+            "id": 53,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "m-2-50",
+            "created_at": "2026-11-04T08:47:59.792315+00:00"
+          }
+        }
+      ],
+      "sent": [],
+      "attempts": [
+        1793782079620
+      ],
+      "console_errors": [],
+      "responses": [
+        {
+          "t": 1793782079537,
+          "url": "http://127.0.0.1:15173/room/T9NWP0",
+          "status": 200,
+          "finished_at": 1793782079541
+        },
+        {
+          "t": 1793782079541,
+          "url": "http://127.0.0.1:15173/assets/index-OVcbz-aT.css",
+          "status": 200,
+          "finished_at": 1793782079541
+        },
+        {
+          "t": 1793782079567,
+          "url": "http://127.0.0.1:15173/assets/index-3vQjIhBT.js",
+          "status": 200,
+          "finished_at": 1793782079567
+        },
+        {
+          "t": 1793782079655,
+          "url": "http://127.0.0.1:18000/rooms/T9NWP0",
+          "status": 200,
+          "finished_at": 1793782079656
+        },
+        {
+          "t": 1793782079657,
+          "url": "http://127.0.0.1:18000/rooms/T9NWP0/queue_list",
+          "status": 200,
+          "finished_at": 1793782079657
+        },
+        {
+          "t": 1793782079666,
+          "url": "http://127.0.0.1:18000/rooms/T9NWP0/chats?limit=50",
+          "status": 200,
+          "finished_at": 1793782079666
+        },
+        {
+          "t": 1793782079669,
+          "url": "http://127.0.0.1:15173/assets/FilePlayer-BLosH5HF.js",
+          "status": 200,
+          "finished_at": 1793782079669
+        },
+        {
+          "t": 1793782079671,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": 1793782079779
+        }
+      ],
+      "clicks": [
+        {
+          "kind": "unmute",
+          "first_seen": 1793782079789,
+          "attempted_at": 1793782080790,
+          "x": 640.0078125,
+          "y": 699.5,
+          "t": 1793782080792,
+          "ok": true,
+          "input_finished_at": 1793782080801
+        }
+      ],
+      "t0": 1793782079534
+    }
+  ],
+  "finished_at": "2026-11-04T08:48:03.079Z"
+}
