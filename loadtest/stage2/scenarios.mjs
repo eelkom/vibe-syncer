@@ -25,16 +25,28 @@ export function inputQueue(ctx) {
     } finally { stopped = true; }
   } };
 }
+export function seekCoordinates(box, currentTime, duration) {
+  if (!box || ![currentTime, duration, box.left, box.width, box.y].every(Number.isFinite) || duration <= 0 || box.width <= 16) {
+    throw new Error('Host seek controls unavailable');
+  }
+  const target = currentTime + 120 > duration ? currentTime - 120 : currentTime + 120;
+  const trackWidth = box.width - 16;
+  const currentX = box.left + 8 + currentTime / duration * trackWidth;
+  const x = box.left + 8 + target / duration * trackWidth;
+  if (target < 0 || target > duration || Math.abs(x - currentX) <= 8) throw new Error('Seek target does not clear the 16px thumb');
+  return { x, y: box.y, target };
+}
 export async function hostAction(ctx, action) {
   const state = ctx.host, start = Date.now();
   if (action === 'seek') {
     const box = state.controls.seek, media = state.media;
     if (!box || !media || !Number.isFinite(media.duration) || !media.duration) throw new Error('Host seek controls unavailable');
-    // Native Chromium range thumb is 16px; target +20s on its usable track.
+    // Native Chromium range thumb is 16px. +120s clears it at the 600s
+    // fixture's 229px track; near the end go -120s instead of clamping.
     // Record the actual sync timestamp, which reflects pointer pixel resolution.
     const ct = media.ct + (media.paused ? 0 : (Date.now() - state.media_at) / 1000);
-    const fraction = Math.min(1, (ct + 20) / media.duration);
-    await state.page.mouse.click(box.left + 8 + fraction * Math.max(0, box.width - 16), box.y);
+    const target = seekCoordinates(box, ct, media.duration);
+    await state.page.mouse.click(target.x, target.y);
   } else {
     const box = state.controls.play;
     if (!box) throw new Error('Host playback button unavailable');

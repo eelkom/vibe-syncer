@@ -1,5 +1,5 @@
 import { firstPlayback } from '../lib/stats.mjs';
-import { delivery, distribution, correctionSeeks, errorWindows, interactionCandidates } from './stats.mjs';
+import { delivery, distribution, correctionSeeks, errorWindows, interactionCandidates, machineStatus } from './stats.mjs';
 const within = (rows, start, end) => rows.filter(r => (r[0] ?? r.t) >= start && (r[0] ?? r.t) <= end);
 export function pageMetrics(data, start, end, profiling) {
   if (!data) return Object.fromEntries(['inp_ms', 'input_count', 'long_task_count', 'long_task_sum_ms', 'dropped_frames', 'total_frames',
@@ -76,7 +76,7 @@ export function metrics(ctx, host, guest, bots, joiner) {
     commit_durations: ctx.job.profiling && guest ? guest.commits.map(c => c[1]) : null,
     seeks: guest?.seeks ?? null, sync: guest?.sync ?? null, host_ws: host?.ws ?? null, guest_ws: guest?.ws ?? null, joiner_ws: joiner?.ws ?? null,
     bots: bots.bots, start, end, traffic_end: ctx.trafficEnd ?? end };
-  return aggregate;
+  return Object.assign(aggregate, machineStatus({ metrics: aggregate }));
 }
 export function boundedJSON(record) {
   let text = JSON.stringify(record);

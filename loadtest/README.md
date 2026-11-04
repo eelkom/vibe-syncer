@@ -185,7 +185,7 @@ node loadtest/summarize.mjs
 
 ## 2단계: 한 방의 인원 증가 (#36)
 
-2단계는 `b86324b` 하나의 프론트 응답성과 재생 상태를 측정한다. 서버 지표는 원인을 설명하는 자료다. 1단계 시나리오·원본을 수정하지 않으며 새 러너와 `stage2/` 모듈을 사용한다. `--instrument`가 없는 서버 실행은 1단계와 동일하다.
+2단계는 `b86324b` 하나의 프론트 응답성과 재생 상태를 측정한다. 전제 조건은 **전원 연결, 덮개 열기, 전체 약 3시간**이다. 서버 지표는 원인을 설명하는 자료다. 1단계 시나리오·원본을 수정하지 않으며 새 러너와 `stage2/` 모듈을 사용한다. `--instrument`가 없는 서버 실행은 1단계와 동일하다.
 
 준비와 실행(저장소 루트):
 
@@ -210,7 +210,7 @@ N은 호스트·관찰자 각각 실제 브라우저 1개와 봇 N-2개의 합�
 
 회차마다 새 DB·서버·브라우저·봇 자식 프로세스를 만든다. 보통 봇 입장은 50ms마다 시작하며 REST join 후 WS를 연다. 호스트·관찰자는 모두 `no-user-gesture-required`; 관찰자에만 `--enable-precise-memory-info`를 추가한다. 기존 scriptedUser가 관찰자의 소리 켜기를 한 번 클릭한 뒤 멈추며 실제 unmuted/playing 상태를 콘솔 계측으로 확인한다. 출력 음소거·외부 DNS 차단은 그대로다. 모든 봇의 입장 확인 상한은 60초다. 그때 미완료면 `setup_failed`와 연결 수를 저장하고 30초 더 관찰한다. 이는 서비스 실패이므로 `ok=true`이며 배치를 중단하지 않는다. 스크립트 오류만 `ok=false`다.
 
-- steady: 입장 후 10초 안정화, 60초 관찰. 측정 시작 15초에 호스트 UI 일시정지, 18초 재생, 33초 +20초 목표 seek, 48초 일시정지, 51초 재생. 전송 sync 프레임으로 확인하며 원본에 실제 timestamp를 남긴다. range 입력의 목표는 현재 위치+20초이고 실제 값은 포인터의 픽셀 해상도에 따른다. 봇은 합계 2개/초를 순서대로 보내며 N=2는 관찰자 키보드가 이를 대신한다. 관찰자는 별도로 5초마다 한 메시지를 입력한다.
+- steady: 입장 후 10초 안정화, 60초 관찰. 측정 시작 15초에 호스트 UI 일시정지, 18초 재생, 33초 +120초 목표 seek, 48초 일시정지, 51초 재생. 전송 sync 프레임으로 확인하며 원본에 실제 timestamp를 남긴다. range 입력은 현재 위치+120초를 목표로 하며 곡 끝을 넘으면 -120초로 바꿔 16px 손잡이 밖을 누른다. 실제 값은 포인터의 픽셀 해상도에 따른다. 봇은 합계 2개/초를 순서대로 보내며 N=2는 관찰자 키보드가 이를 대신한다. 관찰자는 별도로 5초마다 한 메시지를 입력한다.
 - chat_burst: 입장 후 5초 안정화, 30초 관찰. 각 봇이 매초의 임의 시점에 1개를 보내고 관찰자는 2초마다 입력한다. 관찰자 CPU 1배·4배를 `default`, `default-cpu4`, `pool-250`, `pool-250-cpu4`로 분리한다. 전송 종료 뒤 고정 30초까지 수신을 정리한다. 좋은 값에 따라 대기를 단축하지 않는다.
 - join_burst: 호스트·관찰자 입장 후 10초 안정화한다. 봇 N-3개는 3초에 균등하게 입장을 시작한다. 1.5초 시점에 입장자가 랜딩으로 이동해 Join Existing Room → 코드·닉네임 입력 → 제출을 실제 mouse/keyboard로 수행한다. 입장자 sessionStorage는 미리 넣지 않는다. 제출 클릭 직전부터 첫 재생 확인까지 join_ms를 계산하고 입장 후 30초 관찰한다. N<3은 계획에서 제외한다. 입장 완료 상한과 실패 추가 관찰은 공통 규칙과 같다.
 - chat_accumulation: default, N=3, 고정 3회이며 profiling 빌드다. 봇이 200개/초로 10,000개를 보내고 1,000/2,000/5,000/10,000개가 화면에 수신될 때마다 콘솔 체크포인트를 내보내 관찰자 키보드 입력 1건을 실행한다. 발신은 멈추지 않는다. 상한 300초, 수신한 만큼 기록한다. 체크포인트의 heap·DOM 노드 수와 앞 구간의 React commit·Long Task 등, 해당 입력 주변 Event Timing의 INP 후보 값을 기록한다.
@@ -223,11 +223,20 @@ N은 호스트·관찰자 각각 실제 브라우저 1개와 봇 N-2개의 합�
 
 봇은 child_process.fork로 분리한다. Full jitter의 5회 재시도와 open 때 카운터 초기화를 그대로 사용한다. 개별 입장 시간, 끊김·close code·시도 소진, monitorEventLoopDelay(20ms resolution)의 최댓값과 p95를 기록한다. 서버의 선택적 `--instrument <loadtest 안 파일>`은 asyncio 100ms 지연, async broadcast 소요 시간·연결 수, 1초 pool checkedout/overflow를 JSONL에 기록한다. 각 초 count·sum·max·상한 버킷 기반 p95 근사를 저장하며 메시지마다 파일을 쓰지 않는다. Node는 1초마다 ps의 CPU·RSS를 수집하고 끝에 서버 로그의 QueuePool 등장 횟수를 센다. SIGKILL 횟수도 회차에 남긴다. `server_summary`에는 관찰 구간의 이벤트 루프 지연 최댓값·초당 p95 근사의 최댓값, broadcast p95 근사의 최댓값·합계 ms, 최대 연결 수·pool checked_out, CPU·RSS 최댓값을 계산한다. JSONL은 집계 종료 시각이 관찰 구간 안인 초 단위 행, ps는 구간 안의 샘플을 사용한다. QueuePool·강제 종료 횟수는 회차 전체 값이다. 이 값과 연결 끊김·포기·입장 실패·설정 완료 연결 수·호스트 동기화 시간 초과·미전송 수도 요약 표에 중앙값·최댓값으로 남긴다.
 
-결과는 `results/stage2/<scenario>/b86324b/<condition>/n-<N>/run-<k>.json`, 환경은 같은 루트의 env JSON, 요약은 `results/stage2/SUMMARY.md`다. 원시 WS 프레임과 browser_artifacts는 저장하지 않고 미디어 샘플·값 배열·집계를 compact JSON으로 저장한다. 2MiB를 넘는 진단 배열이 생기면 샘플과 집계를 유지하고 배열 생략 이유를 남긴 스크립트 실패로 저장한다. 기존 결과는 성공 여부와 무관하게 건너뛰며 명시적 --force만 백업 후 재실행한다. 실패 회차를 자동 재시도하지 않는다.
+결과는 `results/stage2/<scenario>/b86324b/<condition>/n-<N>/run-<k>.json`, 환경은 같은 루트의 env JSON, 요약은 `results/stage2/SUMMARY.md`다. 원시 WS 프레임과 browser_artifacts는 저장하지 않고 미디어 샘플·값 배열·집계를 compact JSON으로 저장한다. 2MiB를 넘는 진단 배열이 생기면 샘플과 집계를 유지하고 배열 생략 이유를 남긴 스크립트 실패로 저장한다. 기존 결과는 성공 여부와 무관하게 건너뛴다. `--force`는 지정한 시나리오 전체를 백업 후 다시 실행한다. `--rerun-invalid`는 기존 회차 중 machine_stalled=true 또는 샘플 간격 >5000ms인 회차만 `.previous-*`로 보존한 뒤 다시 실행하며, 유효 회차와 아직 없는 회차는 건너뛴다. 두 옵션을 함께 주면 --force가 우선한다. 자동 재시도하지 않는다.
+
+```bash
+node loadtest/run_stage2.mjs --rerun-invalid
+node loadtest/run_stage2.mjs --scenario steady --force
+```
+
+회차의 `max_sample_gap_ms`는 호스트·관찰자 각각의 인접 샘플 간격 중 최댓값이다. 측정 시작 전 샘플도 포함하며 서로 다른 페이지 사이 간격은 계산하지 않는다. 스크립트 실패도 읽을 수 있는 샘플로 계산한다. 5000ms를 넘으면 `machine_stalled=true`, 판정은 `INVALID_MACHINE_STALL` 하나이며 상태는 INVALID다. 배치를 멈추지 않으며 해당 회차를 합격·불합격 및 통계·결측 집계에서 제외하고 「머신 정지 무효 회차」로 센다. 모두 무효인 N은 INVALID다. 기존 원본의 metrics.raw 샘플도 같은 방식으로 읽기만 하여 판별한다.
+
+환경·회차 JSON의 `power_source.start/end`는 각각 시작·종료 시 `pmset -g batt` 첫 줄에서 읽은 전원 종류다. 명령 실패·알 수 없는 출력은 null과 power_source_errors로 남긴다. 러너 시작이 Battery Power이면 경고 한 줄을 출력하고 계속한다.
 
 호스트 UI 조작 뒤 5초 내 sync 프레임이 없으면 `host_action_timeouts`에 세고 계속한다. 입력 큐가 완료 기한(일반 시나리오 30초) 안에 끝나지 않으면 `input_stuck=true`다. 관찰 후 스냅샷 평가에 15초간 응답하지 않으면서 페이지가 열려 있고 브라우저 연결이 살아 있으면 `page_unresponsive=true`로 기록하고 읽을 수 없는 값은 null로 둔다. 좌표 누락·평가 예외·페이지 crash/종료·브라우저 연결 종료처럼 판별 불가능하거나 도구에서 발생한 오류는 스크립트 실패로 남긴다. 두 서비스 상태는 `ok=true`를 유지하며 각각 `HOST_SYNC_TIMEOUT`, `PAGE_STUCK`으로 불합격이다.
 
-판정은 2026-11-04 확정한 규칙을 고정한다. PLAY_CORRECTION(steady), LOST, DUPLICATES, BOT_LOST, JOIN_FAILED, RETRY_EXHAUSTED, SETUP_FAILED, QUEUE_POOL, DISCONNECTED는 불합격 사유다. SCRIPT_ERROR도 표에서 FAIL이다. 한 회차라도 FAIL이면 같은 N은 FAIL이며 결측을 0으로 바꾸거나 회차를 제외하지 않는다. INP 200ms·전달 p95 1000ms는 시험 조건의 외부 기준 초과 여부를 별도 표시하고, err_p95 500ms는 공인 기준이 없는 자체 목표다. p75/p95를 포함한 각 지표의 회차 중앙값·최댓값을 남긴다. Long Task·프레임은 기록만 한다. 봇 이벤트 루프 p95 >100ms는 측정기 부하로 표시해 지연 값의 신뢰 한계를 설명하며 제외하지 않는다.
+판정은 2026-11-04 확정한 규칙을 고정한다. PLAY_CORRECTION(steady), LOST, DUPLICATES, BOT_LOST, JOIN_FAILED, RETRY_EXHAUSTED, SETUP_FAILED, QUEUE_POOL, DISCONNECTED는 불합격 사유다. SCRIPT_ERROR도 표에서 FAIL이다. 유효 회차 중 한 회차라도 FAIL이면 같은 N은 FAIL이며 결측을 0으로 바꾸지 않는다. 머신 정지 무효 회차만 제외한다. INP 200ms·전달 p95 1000ms는 시험 조건의 외부 기준 초과 여부를 별도 표시하고, err_p95 500ms는 공인 기준이 없는 자체 목표다. p75/p95를 포함한 각 지표의 회차 중앙값·최댓값을 남긴다. Long Task·프레임은 기록만 한다. 봇 이벤트 루프 p95 >100ms는 측정기 부하로 표시해 지연 값의 신뢰 한계를 설명하며 제외하지 않는다.
 
 스모크는 N=2/10, pool-250은 N=10, 회차 1회다. steady 20초, chat_burst 10초(정리 상한은 동일), join_burst 입장 후 10초, accumulation은 N=3에서 500개·체크포인트 100/500이다. CPU 4배도 포함한다.
 

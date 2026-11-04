@@ -1,9 +1,11 @@
+import { machineStatus } from './stats.mjs';
 export const SHA = 'b86324b';
 export function options(args) {
-  const out = { smoke: false, force: false, scenario: 'all', runs: 3 };
+  const out = { smoke: false, force: false, rerunInvalid: false, scenario: 'all', runs: 3 };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--smoke') out.smoke = true;
     else if (args[i] === '--force') out.force = true;
+    else if (args[i] === '--rerun-invalid') out.rerunInvalid = true;
     else if (args[i] === '--scenario') out.scenario = args[++i];
     else if (args[i] === '--runs') out.runs = Number(args[++i]);
     else throw new Error(`Unknown argument ${args[i]}`);
@@ -11,6 +13,11 @@ export function options(args) {
   if (!['all', 'steady', 'chat_burst', 'join_burst', 'chat_accumulation'].includes(out.scenario)) throw new Error('Unknown scenario');
   if (!Number.isInteger(out.runs) || out.runs < 1) throw new Error('Invalid runs');
   return out;
+}
+export function shouldRun(existing, opts) {
+  if (opts.force) return true;
+  if (opts.rerunInvalid) return Boolean(existing && machineStatus(existing).machine_stalled);
+  return !existing;
 }
 export function plan(opts) {
   const jobs = [];
@@ -33,7 +40,7 @@ export function plan(opts) {
 }
 export function skipAfterFailures(job, previous, expectedRuns) {
   if (!job.condition.startsWith('pool-250')) return false;
-  const smaller = previous.filter(r => r.scenario === job.scenario && r.condition === job.condition && r.n < job.n && !r.skipped);
+  const smaller = previous.filter(r => r.scenario === job.scenario && r.condition === job.condition && r.n < job.n && !r.skipped && !machineStatus(r).machine_stalled);
   return [...new Set(smaller.map(r => r.n))].some(n => {
     const rounds = smaller.filter(r => r.n === n);
     return rounds.length === expectedRuns && rounds.every(r => r.setup_failed === true && r.ok === true);

@@ -37,8 +37,28 @@ export function parseServerJSONL(text) {
     try { return JSON.parse(line); } catch { throw new Error(`Invalid server JSONL line ${i + 1}`); }
   });
 }
+export function maxSampleGap(...series) {
+  let maximum = null;
+  for (const samples of series) {
+    let previous = null;
+    for (const sample of samples ?? []) {
+      const t = Array.isArray(sample) ? sample[0] : sample?.t;
+      if (Number.isFinite(t) && previous !== null) maximum = Math.max(maximum ?? 0, t - previous);
+      previous = Number.isFinite(t) ? t : null;
+    }
+  }
+  return maximum;
+}
+export function machineStatus(run) {
+  const m = run.metrics ?? {}, raw = m.raw ?? {};
+  const gaps = [m.max_sample_gap_ms, maxSampleGap(raw.host_samples, raw.guest_samples)].filter(Number.isFinite);
+  const maximum = gaps.length ? Math.max(...gaps) : null;
+  return { max_sample_gap_ms: maximum, machine_stalled: m.machine_stalled === true || run.machine_stalled === true || maximum > 5000 };
+}
+export function shouldStopBatch(run) { return !run.ok && !machineStatus(run).machine_stalled; }
 export function verdict(run) {
-  if (run.skipped) return { pass: false, reasons: ['SKIPPED'], external: {} };
+  if (machineStatus(run).machine_stalled) return { status: 'INVALID', pass: null, reasons: ['INVALID_MACHINE_STALL'], external: {} };
+  if (run.skipped) return { status: 'SKIPPED', pass: false, reasons: ['SKIPPED'], external: {} };
   const m = run.metrics ?? {}, reasons = [];
   const add = (yes, code) => { if (yes) reasons.push(code); };
   add(!run.ok, 'SCRIPT_ERROR'); add(run.setup_failed, 'SETUP_FAILED');
@@ -53,7 +73,7 @@ export function verdict(run) {
   const external = { inp_over_200: m.inp_ms == null ? null : m.inp_ms > 200,
     delivery_p95_over_1000: m.delivery_ms?.p95 == null ? null : m.delivery_ms.p95 > 1000,
     err_p95_over_500: (m.err_p95 ?? m.err_ms?.p95) == null ? null : (m.err_p95 ?? m.err_ms?.p95) > 500 };
-  return { pass: reasons.length === 0, reasons, external, measurement_load: (m.bot_event_loop?.p95_ms ?? 0) > 100 };
+  return { status: reasons.length ? 'FAIL' : 'PASS', pass: reasons.length === 0, reasons, external, measurement_load: (m.bot_event_loop?.p95_ms ?? 0) > 100 };
 }
 
 export function interactionCandidates(events) {
