@@ -10,6 +10,18 @@ test('nearest-rank p95 uses ceil, handles empty and one value', () => {
   assert.equal(percentile([1, 2, 3, 4, 5]), 5);
   assert.equal(percentile([4]), 4); assert.equal(percentile([]), null);
 });
+test('nearest-rank p75 and five-run p95 match the reported table', () => {
+  assert.equal(percentile([5, 1, 4, 2, 3], 0.75), 4);
+  assert.equal(percentile(Array.from({ length: 20 }, (_, i) => i + 1), 0.75), 15);
+  assert.equal(percentile([], 0.75), null);
+  const runs = [5, 1, 4, 2, 3].map(v => ({ scenario: 'late_join', commit: 'abc', condition: 'default', ok: true,
+    metrics: { err_p75_ms: v } }));
+  const group = summarizeRuns(runs)[0];
+  assert.deepEqual(group.metrics.err_p75_ms, { median: 3, p75: 4, p95: 5, valid: 5, missing: 0 });
+  assert.match(markdown([group]), /회차 p75 \| 회차 p95/);
+  assert.match(markdown([group]), /err_p75_ms \| 3 \| 4 \| 5 \| 5 \| 0/);
+  assert.match(markdown([group]), /회차가 5개면 nearest-rank p95는 최댓값과 같다/);
+});
 test('median: odd, even, null and zero', () => {
   assert.equal(median([3, 1, 2]), 2); assert.equal(median([4, 2, 1, 3]), 2.5);
   assert.equal(median([null, 0, 2]), 1); assert.equal(median([null]), null);
@@ -60,11 +72,20 @@ test('summarize never converts null/missing failed runs to zero', () => {
   const runs = [10, null, 30, undefined].map((v, i) => ({ scenario: 'late_join', commit: 'abc', condition: 'default', ok: i !== 3,
     metrics: i === 3 ? {} : { sync_time_ms: v } }));
   const g = summarizeRuns(runs)[0];
-  assert.deepEqual(g.metrics.sync_time_ms, { median: 20, p95: 30, valid: 2, missing: 2 });
+  assert.deepEqual(g.metrics.sync_time_ms, { median: 20, p75: 30, p95: 30, valid: 2, missing: 2 });
   assert.equal(g.script_failed, 1);
   const allNull = summarizeRuns([{ ...runs[0], metrics: { sync_time_ms: null } }])[0];
   assert.equal(allNull.metrics.sync_time_ms.median, null);
-  assert.match(markdown([allNull]), /null \| null \| 0 \| 1/);
+  assert.match(markdown([allNull]), /null \| null \| null \| 0 \| 1/);
+});
+test('summarize counts explicit ineffective injections and retains null counters', () => {
+  const runs = [false, true, null, undefined].map(v => ({ scenario: 'autoplay', commit: 'abc', condition: 'all-blocked', ok: true,
+    metrics: { injection_effective: v, blocked_play_calls: v === false ? 0 : null } }));
+  const group = summarizeRuns(runs)[0];
+  assert.equal(group.injection_ineffective, 1);
+  assert.deepEqual(group.metrics.blocked_play_calls, { median: 0, p75: 0, p95: 0, valid: 1, missing: 3 });
+  assert.match(markdown([group]), /주입 무효 회차/);
+  assert.match(markdown([group]), /autoplay\/abc\/all-blocked \| 4 \| 0 \| 0 \| 1/);
 });
 test('playback/audible timestamps require .2s advancement and audible state', () => {
   const a = [sample(0, 5), sample(100, 5.1), sample(300, 5.3)];

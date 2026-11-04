@@ -4,12 +4,12 @@
 
 ## 전제 조건과 격리
 
-- 저장소 루트에서 실행한다. Node 22 이상, npm, uv, Python 3.11, PostgreSQL 도구(`pg_config`, `initdb`, `pg_ctl`), Chromium 실행 가능한 환경이 필요하다.
+- 저장소 루트에서 실행한다. Node 22 이상, npm, uv, Python 3.11, PostgreSQL 도구(`pg_config`, `initdb`, `pg_ctl`), `/opt/homebrew/bin/ffmpeg`(VP8/libvpx·Opus/libopus 지원)와 `/opt/homebrew/bin/ffprobe`, Chromium 실행 가능한 환경이 필요하다. ffmpeg가 없으면 명확한 오류로 중단한다.
 - DB는 **127.0.0.1:55432**, 사용자 `vibe`, 비밀번호 없음, `CREATEDB` 권한. 5432나 운영 DB는 사용하지 않는다. 실행기는 다른 DB 호스트·포트를 거부하고 `loadtest_*` DB만 만든다. 기존 동명 DB가 있으면 삭제하지 않고 실패한다.
 - 포트: API/WS `18000`, 프론트 `15173`, 음원 `15174`. 전부 127.0.0.1에만 바인딩한다. 같은 도구의 동시 실행은 `.logs/stage1.lock`으로 거부한다. 비정상 종료 후 잠금이 남으면 실행 중 프로세스가 없음을 확인한 다음 해당 잠금 파일만 제거한다.
 - 현재 환경에 이미 떠 있는 전용 DB와 `loadtest/.pg/`, `.pg.log`는 그대로 사용한다. **이 환경에서는 db.sh를 실행하지 않는다.** 아래 DB 명령은 다른 사람이 새 환경을 만들 때 사용한다.
-- Python 서버는 dotenv 로딩을 끄고 GEMINI/GOOGLE 키를 지우며 AI 환영 함수는 고정 문자열, DJ 함수는 예외로 치환한다. 치환 후 `app.main`을 import한다. 외부 소켓 연결도 거부한다. 미디어는 로컬 WAV이며 Gemini/YouTube API와 운영 서버를 사용하지 않는다.
-- 모든 브라우저 컨텍스트는 `context.route`와 `routeWebSocket`으로 127.0.0.1 이외 요청을 차단한다. 차단 건수는 원본에 남으며 해제 옵션은 없다. 외부 폰트 차단 오류는 발생할 수 있다.
+- Python 서버는 dotenv 로딩을 끄고 GEMINI/GOOGLE 키를 지우며 AI 환영 함수는 고정 문자열, DJ 함수는 예외로 치환한다. 치환 후 `app.main`을 import한다. 외부 소켓 연결도 거부한다. 미디어는 로컬 WebM 영상 파일이며 Gemini/YouTube API와 운영 서버를 사용하지 않는다.
+- 브라우저에 `--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1`을 고정 적용한다. 해제 옵션은 없다. 일반 HTTP와 WebSocket은 Playwright Node 프로세스를 거치지 않는다. `blocked_external_requests`는 `page.on('request')`에서 센 127.0.0.1 이외 요청 수와 `page.on('websocket')`에서 센 외부 연결 수의 합이다. 외부 폰트 차단 오류는 발생할 수 있다. `history_race`의 `/chats`만 지연 주입을 위해 `page.route`로 가로챈다.
 
 ## 환경 변수와 설치
 
@@ -67,7 +67,7 @@ python3 -m py_compile loadtest/server/run_server.py
 bash -n loadtest/scripts/db.sh loadtest/scripts/prepare_commit.sh
 ```
 
-단위 테스트는 중앙값, nearest-rank p95, 보간·paused 제외, 2초 연속 동기화, 1초 구간 최고치, 두 재연결 공식 범위, 정확한 마커 집계, summarize의 null 처리를 검증한다.
+단위 테스트는 중앙값, nearest-rank p75/p95, 보간·paused 제외, 2초 연속 동기화, 1초 구간 최고치, 두 재연결 공식 범위, 정확한 마커 집계, summarize의 null 처리와 주입 무효 회차 집계를 검증한다.
 
 봇만 스모크(브라우저를 실행하지 않음; `b86324b` 준비 필요):
 
@@ -104,13 +104,18 @@ node loadtest/summarize.mjs
 | autoplay (#14, #15) | `ea2acea`, `a086001`, `b86324b` | muted-allowed, all-blocked |
 
 - 회차마다 `loadtest_<scenario>_<sha>_<n>` DB를 새로 만들고 서버를 새 프로세스로 시작한다. 방·호스트·게스트는 해당 서버의 `POST /rooms/`, `POST /rooms/join`으로 생성한다. 곡만 `queue_items`에 SQL로 넣는다. `platform='Local'`은 모든 비교 커밋의 `backend/app/schemas/schemas.py`에서 `str`, SQL 모델에서 `String`으로 허용된다.
-- `.media/tone.wav`는 8kHz 모노 16bit 600초, 440Hz 사인파다. Range 지원 서버가 15174에서 제공하며 프론트 서버는 SPA 폴백을 제공한다. WAV는 커밋하지 않는다.
+- `.media/tone.webm`은 ffmpeg로 생성하는 600초 영상이다. VP8 영상(16x16, 1fps, 검은 단색)과 Opus 오디오(440Hz 사인파, 48kHz 모노)를 담는다. `music_url`은 `http://127.0.0.1:15174/tone.webm`이며 Range 지원 서버가 `video/webm`으로 제공한다. 프론트 서버는 SPA 폴백을 제공한다. 미디어 파일은 커밋하지 않는다. 브라우저 없이 생성·검증하려면 다음을 실행한다.
+
+  ```bash
+  node --input-type=module -e "import { tone } from './loadtest/lib/static-server.mjs'; console.log(await tone());"
+  /opt/homebrew/bin/ffprobe -v error -show_entries stream=codec_name,codec_type,width,height,r_frame_rate:format=duration -of json loadtest/.media/tone.webm
+  ```
 - late_join: 브라우저 인스턴스를 호스트/게스트로 분리한다. 호스트는 자동재생 허용, 게스트는 사용자 활성화 필요 정책. 호스트 재생을 확인한 뒤 UI 일시정지 → 300ms → UI 재생, 두 `sync` 전송 프레임을 확인한다. 30초 후 게스트 goto 직전 T0, 25초 관찰한다. 스모크는 5초 대기/8초 관찰하므로 10초·20초 오차는 null이다.
 - message_burst: 게스트 브라우저의 채팅 조회 응답 완료와 로딩 UI 제거를 확인한다. Node 발신자 1개는 N개를 **대기 없이 연속 전송**, 대조군 Node 수신자 1개가 모두 받거나 120초 후, DOM이 3초 조용해지면 채팅 영역만 집계한다. 마커는 공백으로 나뉜 정확 토큰으로 세며 초과 등장 횟수를 duplicates로 기록한다. 스모크는 N=50만 사용한다.
-- history_race는 **지연 주입**이다. GET chats를 서버 전송 전에 보류하고 게스트 WebSocket 첫 수신을 확인한다. A 25개를 20ms 간격으로 보내 마지막 프레임을 확인한다. 조회를 서버에 보내 응답을 보류하고 A 포함/B 미포함을 확인한다. B 25개를 같은 간격으로 보내 마지막 프레임 확인 후 응답을 전달하고 12초 대기한다. OPTIONS는 그대로 통과한다. 스모크는 각 5개/3초다. 조회 보류 중 WS 수신이 불가능하면 timeout과 순서 오류를 저장하고 중단한다.
+- history_race는 **지연 주입**이다. GET chats를 서버 전송 전에 보류하고 게스트 WebSocket 첫 수신을 확인한다. A 25개를 20ms 간격으로 보내 마지막 프레임을 확인한다. 조회를 서버에 보내 응답을 보류하고 A 포함/B 미포함을 확인한다. B 25개를 같은 간격으로 보내 마지막 프레임 확인 후 응답을 전달하고 12초 대기한다. OPTIONS는 그대로 통과한다. 두 번째부터의 GET은 `route.fallback()`으로 통과시키고 `extra_history_gets`로 세며 오류로 처리하지 않는다. 스모크는 각 5개/3초다. 조회 보류 중 WS 수신이 불가능하면 timeout과 순서 오류를 저장하고 중단한다.
 - reconnect 봇: 200개를 50ms마다 입장시키고 모두 연결된 뒤 10초 안정화한다. SIGTERM 후 종료를 확인하고 **고정 3초 뒤** 서버를 새로 시작한다. 전원 연결/포기 또는 장애 시작부터 120초까지 기록한다. 스모크는 10개/2초 안정화. 앱과 동일하게 onopen에서 카운터를 0으로 초기화하며 최대 재시도는 5회다. exponential은 `min(30000,1000*2^attempt)`, full-jitter는 `random()*min(30000,1000*2^attempt)`다. 근거는 `1b2e6c4:useWebSocket.ts:33,61,111-123`, `b86324b:useWebSocket.ts:32-42,95,112,176-190`. 1초 구간은 시도는 장애 시작, open은 서버 listen 기준의 고정 구간이다. 서버 listen 시각은 uvicorn이 bind를 마친 직후 Python 실행기가 기록한다. RSS는 측정하지 않는다.
 - reconnect 브라우저: 해당 커밋 프론트/서버에서 10개 컨텍스트를 연결하고 같은 재시작을 한다. `page.on('websocket')` 시각과 첫 재시도 분포를 기록한다. 스모크는 2개 컨텍스트. 브라우저 인스턴스는 공유하되 컨텍스트는 분리한다.
-- autoplay: 호스트는 late_join과 같은 UI 경로로 서버 재생 상태를 남기고 5초 대기한다. 게스트는 두 조건 모두 사용자 활성화 필요 정책. `all-blocked`는 init script로 사용자 활성화 전 play를 NotAllowedError로 거부하는 **주입**이며 저전력 모드 등을 모사한다. 30초까지 소리가 없으면 failed. 들리기 시작이 마감 직전이면 오차 측정에 필요한 2초만 추가 관찰하며 30초 성공 마감은 유지한다. 스모크도 환경별 1회/30초다.
+- autoplay: 호스트는 late_join과 같은 UI 경로로 서버 재생 상태를 남기고 5초 대기한다. 게스트는 두 조건 모두 사용자 활성화 필요 정책. `all-blocked`는 init script로 사용자 활성화 전 play를 NotAllowedError로 거부하고, 미디어 요소의 `setAttribute('autoplay', ...)`와 `autoplay` setter를 무시하는 **주입**이며 저전력 모드 등을 모사한다. 활성화 뒤에는 원래 동작으로 전달하며 도구가 대신 play를 호출하지 않는다. 세 경로의 차단 횟수 합계를 `window.__blockedPlay`와 회차 지표 `blocked_play_calls`에 기록한다. `injection_effective`는 첫 실제 클릭 전(클릭이 없으면 전체 관찰 구간)에 재생 중 ct가 0.2초 이상 증가한 샘플이 없으면 true다. `muted-allowed`에서는 두 지표 모두 null이다. 요약 표는 `injection_effective`가 명시적으로 false인 회차 수를 표시한다. 30초까지 소리가 없으면 failed. 들리기 시작이 마감 직전이면 오차 측정에 필요한 2초만 추가 관찰하며 30초 성공 마감은 유지한다. 스모크도 환경별 1회/30초다.
 
 ## 커밋별 UI와 sessionStorage 근거
 
@@ -137,7 +142,7 @@ node loadtest/summarize.mjs
 
 브라우저 init script는 100ms마다 첫 `audio,video`의 `{t: Date.now(), ct, paused, muted, volume}` 또는 `{t, none:true}`를 수집한다. 게스트 샘플 시각에서 호스트 위치를 선형 보간해 절대 오차(ms)를 구한다. 게스트와 보간 양 끝의 호스트가 모두 재생 중이어야 유효하다. 외삽하지 않는다. 250ms를 넘는 관측 공백·paused·미디어 없음은 2초 연속 동기화 판정을 끊는다. `sync_time_ms`는 오차 500ms 미만이 2초 유지되는 구간의 시작 시각이다. 지정 시점 오차는 ±200ms 안의 가장 가까운 샘플이며 없으면 null이다.
 
-late_join의 마지막 10초 오차 p50/p95는 유효 샘플에서 계산한다. autoplay는 재생 중인 샘플에서 ct가 0.2초 이상 증가한 첫 확인 시각을 사용하며 audible은 추가로 muted=false, volume>0이어야 한다. 모든 회차별 값은 그대로 저장하고 요약에서 회차 중앙값과 nearest-rank p95를 구한다. null/미기록은 0으로 바꾸지 않으며 결측 회차 수를 표시한다. 실패한 회차도 집계에서 없애지 않는다.
+late_join의 마지막 10초 오차 p50/p75/p95는 유효 샘플에서 계산한다. autoplay는 재생 중인 샘플에서 ct가 0.2초 이상 증가한 첫 확인 시각을 사용하며 audible은 추가로 muted=false, volume>0이어야 한다. 모든 회차별 값은 그대로 저장하고 요약에서 회차 중앙값과 nearest-rank p75/p95를 구한다. 회차가 5개면 nearest-rank p95는 최댓값과 같다. null/미기록은 0으로 바꾸지 않으며 결측 회차 수를 표시한다. 실패한 회차도 집계에서 없애지 않는다.
 
 ## 브라우저 스모크 확인 항목과 한계
 
@@ -146,5 +151,5 @@ late_join의 마지막 10초 오차 p50/p95는 유효 샘플에서 계산한다.
 - history_race 원본의 A 수신 → 응답 보류 → B 수신 → 전달 순서와 스냅샷을 확인한다. 순서를 충족하지 못하면 결과를 정상 측정으로 해석하지 않는다.
 - 브라우저 SIGTRAP 제약 때문에 이 샌드박스에서는 브라우저 시나리오를 실행하지 않았다. Claude가 샌드박스 밖에서 스모크 로그를 검토해야 한다.
 - 봇은 한 Node 프로세스의 이벤트 루프·네트워크·CPU 스케줄링 한계가 포함된다. 실제 사용자 200명의 브라우저 부하를 재현하지 않는다. 소수 실제 브라우저 검증은 공식 동작 확인용이다.
-- 로컬 WAV와 동일 머신 시계의 결과다. YouTube/원격망/운영 부하, 실제 저전력 모드, 확성기에서 소리가 나는지는 재현하지 않는다. audible은 미디어 요소 상태를 기준으로 한다. 무음 허용 여부는 Chromium 정책에도 좌우된다.
+- 로컬 영상 파일과 동일 머신 시계의 결과다. 실제 서비스 경로는 YouTube iframe이지만 시험은 로컬 영상 파일이므로 YouTube의 버퍼링과 `handleUnmute`의 YouTube 분기는 재지 않는다. 원격망/운영 부하, 실제 저전력 모드, 확성기에서 소리가 나는지는 재현하지 않는다. audible은 미디어 요소 상태를 기준으로 한다. 무음 허용 여부는 Chromium 정책에도 좌우된다.
 - 스모크 수치는 작은 크기의 도구 검증 결과이며 성능 결론에 사용하지 않는다. 로그·캐시·음원·아카이브·전용 DB 데이터는 git에서 제외한다.

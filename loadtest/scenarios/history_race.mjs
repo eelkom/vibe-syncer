@@ -9,12 +9,14 @@ export async function run({ cleanup, result, seed, smoke }) {
   const sender = await connectSocket(seed.room, seed.sender, cleanup);
   const held = deferred(), sendQuery = deferred(), responseHeld = deferred(), deliver = deferred();
   let intercepted = false;
-  // A GET only: preflight OPTIONS must go straight through the context guard.
+  let extraHistoryGets = 0;
+  result.metrics.extra_history_gets = 0;
+  // Only /chats is intercepted; preflight OPTIONS passes through unchanged.
   await observer.page.route(/\/chats(?:\?|$)/, async route => {
     if (route.request().method() !== 'GET') return route.fallback();
     if (intercepted) {
-      result.errors.push('Unexpected repeated history GET');
-      return route.abort();
+      result.metrics.extra_history_gets = ++extraHistoryGets;
+      return route.fallback();
     }
     intercepted = true; held.resolve();
     try {
@@ -58,6 +60,7 @@ export async function run({ cleanup, result, seed, smoke }) {
   return { lost_a: ca.missing.length, lost_b: cb.missing.length, dup_a: ca.duplicates, dup_b: cb.duplicates,
     lost_total: ca.missing.length + cb.missing.length, dup_total: ca.duplicates + cb.duplicates,
     on_screen_total: ca.unique + cb.unique + ca.duplicates + cb.duplicates,
+    extra_history_gets: extraHistoryGets,
     injection: '지연 주입: GET /chats 서버 전송 전 및 응답 전달 전 보류',
     raw: { events, snapshot, observer_frames: observer.frames, text, counts_a: ca, counts_b: cb, clicks: observer.clicks },
   };

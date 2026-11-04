@@ -10,10 +10,11 @@ export async function run({ cleanup, result, seed, condition, runNumber }) {
   const sender = await connectSocket(seed.room, seed.sender, cleanup);
   const control = await connectSocket(seed.room, seed.host, cleanup);
   const n = Number(condition), markers = Array.from({ length: n }, (_, i) => `m-${runNumber}-${i + 1}`);
+  const markerSet = new Set(markers);
   const start = Date.now();
   // Deliberately synchronous: no await, pacing, adaptive batch size, or retry.
   for (const message of markers) sender.send(JSON.stringify({ type: 'chat', message }));
-  const received = () => control.frames.filter(f => f.data.type === 'chat' && markers.includes(f.data.message));
+  const received = () => control.frames.filter(f => f.data.type === 'chat' && markerSet.has(f.data.message));
   await until(() => new Set(received().map(f => f.data.message)).size === n || Date.now() - start >= 120000, 121000, 'control burst deadline');
   await settleChat(observer);
   await stopUser();

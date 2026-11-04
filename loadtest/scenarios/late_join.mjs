@@ -24,7 +24,7 @@ export async function run(ctx) {
     err_at_5s_ms: errorAt(errors, guest.t0 + 5000),
     err_at_10s_ms: errorAt(errors, guest.t0 + 10000),
     err_at_20s_ms: errorAt(errors, guest.t0 + 20000),
-    err_p50_ms: median(last), err_p95_ms: percentile(last), clicks: guest.clicks,
+    err_p50_ms: median(last), err_p75_ms: percentile(last, 0.75), err_p95_ms: percentile(last), clicks: guest.clicks,
     first_sync_frame_ms: relative(guest.frames.find(f => f.data.type === 'sync')),
     queue_response_ms: relative(guest.responses.find(r => /\/queue_list(?:\?|$)/.test(r.url))),
     ws_reconnects: Math.max(0, guest.attempts.length - 1),

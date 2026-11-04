@@ -1,22 +1,31 @@
 import http from 'node:http';
 import { createReadStream } from 'node:fs';
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, stat, access, rename } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import { ROOT } from './common.mjs';
-const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.wav': 'audio/wav', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.webm': 'video/webm', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json' };
 export async function tone() {
+  const ffmpeg = '/opt/homebrew/bin/ffmpeg';
+  try { await access(ffmpeg, constants.X_OK); }
+  catch { throw new Error(`Media generation requires executable ffmpeg: ${ffmpeg}`); }
   const dir = path.join(ROOT, '.media');
   await mkdir(dir, { recursive: true });
-  const target = path.join(dir, 'tone.wav');
-  const rate = 8000, frames = rate * 600, size = frames * 2;
-  try { if ((await stat(target)).size === size + 44) return dir; } catch {}
-  const b = Buffer.alloc(size + 44);
-  b.write('RIFF'); b.writeUInt32LE(size + 36, 4); b.write('WAVEfmt ', 8);
-  b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
-  b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28);
-  b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(size, 40);
-  for (let i = 0; i < frames; i++) b.writeInt16LE(Math.round(6000 * Math.sin(2 * Math.PI * 440 * i / rate)), 44 + i * 2);
-  await writeFile(target, b);
+  const target = path.join(dir, 'tone.webm');
+  try { if ((await stat(target)).size > 0) return dir; } catch {}
+  const partial = path.join(dir, 'tone.partial.webm');
+  try {
+    await promisify(execFile)(ffmpeg, [
+      '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+      '-f', 'lavfi', '-i', 'color=c=black:s=16x16:r=1:d=600',
+      '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=600',
+      '-t', '600', '-c:v', 'libvpx', '-pix_fmt', 'yuv420p', '-r', '1',
+      '-c:a', 'libopus', '-ac', '1', '-b:a', '32k', partial,
+    ]);
+    await rename(partial, target);
+  } catch (error) { throw new Error(`ffmpeg tone.webm generation failed: ${error.message}`); }
   return dir;
 }
 export async function staticServer(root, port, spa = false) {

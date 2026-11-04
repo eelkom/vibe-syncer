@@ -19,11 +19,17 @@ export async function run({ cleanup, result, seed, condition }) {
   if (audible !== null && Date.now() < guest.t0 + audible + 2200) await sleep(guest.t0 + audible + 2200 - Date.now());
   gs = await samples(guest);
   const hs = await samples(host), errors = positionErrors(hs, gs);
+  const injection = condition === 'all-blocked' ? await guest.page.evaluate(() => ({
+    blocked: window.__blockedPlay, first_click: window.__userClickEvents[0]?.t ?? null,
+  })) : null;
   return {
     first_playback_ms: firstPlayback(within, guest.t0), audible_ms: audible,
     clicks: guest.clicks, err_after_audible_ms: audible === null ? null : errorAt(errors, guest.t0 + audible + 2000),
     failed: audible === null, reaction_time_ms: 1000,
-    injection: condition === 'all-blocked' ? '지연 없는 play 차단 주입: userActivation 전 NotAllowedError (저전력 모드 모사)' : null,
+    blocked_play_calls: injection?.blocked ?? null,
+    injection_effective: injection === null ? null
+      : firstPlayback(gs.filter(s => injection.first_click === null || s.t < injection.first_click), guest.t0) === null,
+    injection: condition === 'all-blocked' ? 'play・autoplay 차단 주입: userActivation 전 play 거부 및 자동재생 속성 무시 (저전력 모드 모사)' : null,
     raw: { t0: guest.t0, host_samples: hs, guest_samples: gs, errors, guest_console: guest.consoleErrors, host_sent: host.sent },
   };
 }

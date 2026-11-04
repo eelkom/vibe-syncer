@@ -34,7 +34,7 @@ export async function seed(database) {
     await client.query(`INSERT INTO queue_items
       (room_id,user_id,title,artist,thumbnail_url,music_url,platform,is_played)
       VALUES ($1,$2,'Stage1 tone','Local',NULL,$3,'Local',false)`,
-    [room.id, room.host_id, 'http://127.0.0.1:15174/tone.wav']);
+    [room.id, room.host_id, 'http://127.0.0.1:15174/tone.webm']);
   } finally { await client.end(); }
   return { room, host, guest: g, sender };
 }

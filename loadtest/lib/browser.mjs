@@ -13,6 +13,7 @@ export const selectors = {
 export async function launch(cleanup, activation = false) {
   const browser = await chromium.launch({ headless: true, args: [
     `--autoplay-policy=${activation ? 'document-user-activation-required' : 'no-user-gesture-required'}`,
+    '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
   ] });
   browserVersions.add(browser.version());
   cleanup.push(() => browser.close());
@@ -21,23 +22,13 @@ export async function launch(cleanup, activation = false) {
 export async function tab(browser, user, result, cleanup, allBlocked = false) {
   const context = await browser.newContext({ serviceWorkers: 'block' });
   cleanup.push(() => context.close());
-  await context.route('**/*', async route => {
-    if (new URL(route.request().url()).hostname !== '127.0.0.1') {
-      result.blocked_external_requests++; await route.abort();
-    } else await route.continue();
-  });
-  // HTTP routing does not intercept WebSockets; apply the same immutable guard.
-  await context.routeWebSocket('**/*', ws => {
-    if (new URL(ws.url()).hostname !== '127.0.0.1') {
-      result.blocked_external_requests++; ws.close();
-    } else ws.connectToServer();
-  });
   await context.addInitScript(({ user, allBlocked }) => {
     // All nine commits: contexts/UserContext.tsx:16-18 and types/user.ts:1-6
     // read this exact shape. Route is /room/:id in routes/routePath.ts:3.
     sessionStorage.setItem('user', JSON.stringify(user));
     window.__samples = [];
     window.__userClickEvents = [];
+    window.__blockedPlay = 0;
     document.addEventListener('click', event => {
       const button = event.target instanceof Element ? event.target.closest('button') : null;
       const kind = button?.classList.contains('animate-pulse') ? 'sync'
@@ -52,13 +43,41 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
     if (allBlocked) {
       const play = HTMLMediaElement.prototype.play;
       HTMLMediaElement.prototype.play = function (...args) {
-        if (!navigator.userActivation.hasBeenActive) return Promise.reject(new DOMException('Stage1 all-blocked injection', 'NotAllowedError'));
+        if (!navigator.userActivation.hasBeenActive) {
+          window.__blockedPlay++;
+          return Promise.reject(new DOMException('Stage1 all-blocked injection', 'NotAllowedError'));
+        }
         return play.apply(this, args);
       };
+      // FilePlayer passes autoPlay: playing; blocking play() alone leaves
+      // attribute/property autoplay available. Restore native behavior after
+      // activation, without issuing a replacement play request ourselves.
+      const setAttribute = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function (name, ...args) {
+        if (this instanceof HTMLMediaElement && String(name).toLowerCase() === 'autoplay' && !navigator.userActivation.hasBeenActive) {
+          window.__blockedPlay++;
+          return;
+        }
+        return setAttribute.call(this, name, ...args);
+      };
+      const autoplay = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'autoplay');
+      Object.defineProperty(HTMLMediaElement.prototype, 'autoplay', {
+        ...autoplay,
+        set(value) {
+          if (!navigator.userActivation.hasBeenActive) {
+            window.__blockedPlay++;
+            return;
+          }
+          return autoplay.set.call(this, value);
+        },
+      });
     }
   }, { user, allBlocked });
   const page = await context.newPage();
   const state = { page, frames: [], sent: [], attempts: [], consoleErrors: [], responses: [], clicks: [] };
+  page.on('request', request => {
+    if (new URL(request.url()).hostname !== '127.0.0.1') result.blocked_external_requests++;
+  });
   page.on('console', msg => { if (msg.type() === 'error') state.consoleErrors.push({ t: Date.now(), text: msg.text() }); });
   page.on('pageerror', err => result.errors.push(`pageerror: ${err.message}`));
   page.on('response', response => {
@@ -69,6 +88,7 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
     }).catch(() => {});
   });
   page.on('websocket', ws => {
+    if (new URL(ws.url()).hostname !== '127.0.0.1') result.blocked_external_requests++;
     state.attempts.push(Date.now());
     for (const [event, list] of [['framereceived', state.frames], ['framesent', state.sent]]) {
       ws.on(event, frame => {
