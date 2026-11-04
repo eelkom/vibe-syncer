@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { median, percentile, interpolate, positionErrors, syncTime, peakPerSecond, countMarkers, firstPlayback, stddev, countUnexpectedPauses } from '../lib/stats.mjs';
+import { median, percentile, interpolate, positionErrors, syncTime, peakPerSecond, countMarkers, firstPlayback, stddev, countUnexpectedPauses, activationBeforeFirstClick, reconcileClicks, browserReconnectState } from '../lib/stats.mjs';
 import { MAX_ATTEMPTS, reconnectDelay } from '../lib/reconnect-policy.mjs';
 import { summarizeRuns, markdown } from '../summarize.mjs';
 import { parseArgs, plan } from '../lib/config.mjs';
@@ -46,6 +46,58 @@ test('sync does not bridge sampling gaps or a paused sample', () => {
   assert.equal(syncTime([{ t: 0, err: 0 }, { t: 2000, err: 0 }], 0), null);
   const a = Array.from({ length: 30 }, (_, i) => ({ t: i * 100, err: i === 15 ? null : 0 }));
   assert.equal(syncTime(a, 0), null);
+});
+test('2000ms sync threshold supplements the unchanged strict 500ms target', () => {
+  const errors = Array.from({ length: 31 }, (_, i) => ({ t: 1000 + i * 100, err: 1500 }));
+  assert.equal(syncTime(errors, 1000), null);
+  assert.equal(syncTime(errors, 1000, 2000, 2000), 0);
+  errors[5].err = 2000;
+  assert.equal(syncTime(errors, 1000, 2000, 2000), 600);
+  assert.equal(syncTime(errors.slice(0, 20), 1000, 2000, 2000), null);
+});
+test('activation contamination uses pre-click samples, including absent media and no-click runs', () => {
+  const samples = [{ t: 0, act: true }, { t: 100, none: true, act: false },
+    { t: 200, act: true }, { t: 300, act: true }];
+  assert.equal(activationBeforeFirstClick(samples, 100, 300, [{ t: 200 }]), false);
+  assert.equal(activationBeforeFirstClick(samples, 100, 300, [{ t: 250 }]), true);
+  assert.equal(activationBeforeFirstClick(samples, 100, 300, []), true);
+  assert.equal(activationBeforeFirstClick(samples, 100, 200, []), false);
+  assert.equal(activationBeforeFirstClick([{ t: 150, none: true, act: true }], 100, 300, []), true);
+});
+test('click reconciliation requires a distinct trusted record of the intended kind during input', () => {
+  const attempts = [
+    { kind: 'sync', attempted_at: 100, input_finished_at: 200 },
+    { kind: 'sync', attempted_at: 100, input_finished_at: 200 },
+    { kind: 'unmute', attempted_at: 300, input_finished_at: 400 },
+    { kind: 'unmute', attempted_at: 500, input_finished_at: 600 },
+  ];
+  const events = [{ kind: 'sync', t: 150 }, { kind: 'sync', t: 350 }, { kind: 'unmute', t: 601 }];
+  const original = structuredClone(attempts);
+  const checked = reconcileClicks(attempts, events);
+  assert.deepEqual(checked.map(c => c.ok), [true, false, false, false]);
+  assert.equal(checked[0].t, 150);
+  assert.equal(checked[1].t, null);
+  assert.deepEqual(attempts, original);
+});
+test('browser retries use constructor timestamps even when early attempts never open', () => {
+  const log = [
+    { created_at: 0, open_at: 50, close_at: 1000, code: 1012 },
+    { created_at: 2000, open_at: null, close_at: 2100, code: 1006 },
+    { created_at: 4000, open_at: null, close_at: 4100, code: 1006 },
+    { created_at: 8000, open_at: 8050, close_at: null, code: null },
+  ];
+  assert.deepEqual(browserReconnectState(log, 1000, 5000, 9000), {
+    attempts: [2000, 4000, 8000], reconnected: true, gave_up: false,
+  });
+});
+test('browser gives up after five failed retries and one second after final close', () => {
+  const log = Array.from({ length: 5 }, (_, i) => ({ created_at: 1100 + 100 * i,
+    open_at: null, close_at: 1150 + 100 * i, code: 1006 }));
+  assert.equal(browserReconnectState(log, 1000, 2000, 2549).gave_up, false);
+  assert.equal(browserReconnectState(log, 1000, 2000, 2550).gave_up, true);
+  assert.equal(browserReconnectState(log.slice(0, 4), 1000, 2000, 5000).gave_up, false);
+  log[4].close_at = null;
+  assert.equal(browserReconnectState(log, 1000, 2000, 5000).gave_up, false);
 });
 test('pause counts start at the first playing sample after the final host play click', () => {
   const samples = [sample(0, 1), sample(100, 1, true), sample(200, 1, true),
@@ -126,6 +178,23 @@ test('all host-paused autoplay runs yield null aggregates without becoming missi
     metrics: { host_unexpected_pauses: 1, audible_ms: 100 } }])[0];
   assert.equal(group.host_pause_invalid, 1);
   assert.deepEqual(group.metrics.audible_ms, { median: null, p75: null, p95: null, valid: 0, missing: 0 });
+});
+test('activation and host invalidity exclude their union while preserving independent counts', () => {
+  const runs = [
+    { sync_time_2s_ms: 0, activation_before_first_click: true },
+    { sync_time_2s_ms: 1000, activation_before_first_click: true, host_unexpected_pauses: 1 },
+    { sync_time_2s_ms: 20, activation_before_first_click: false },
+    { sync_time_2s_ms: 40 },
+    { sync_time_2s_ms: null, activation_before_first_click: false },
+  ].map(metrics => ({ scenario: 'late_join', commit: 'abc', condition: 'default', ok: true, metrics }));
+  const original = structuredClone(runs);
+  const group = summarizeRuns(runs)[0];
+  assert.equal(group.activation_invalid, 2);
+  assert.equal(group.host_pause_invalid, 1);
+  assert.deepEqual(group.metrics.sync_time_2s_ms, { median: 30, p75: 40, p95: 40, valid: 2, missing: 1 });
+  assert.deepEqual(runs, original);
+  assert.match(markdown([group]), /활성화 오염 무효 회차/);
+  assert.match(markdown([group]), /2000ms는 앱의 재생 시작 시 보정 기준값이고, 500ms는 자체 목표값/);
 });
 test('playback/audible timestamps require .2s advancement and audible state', () => {
   const a = [sample(0, 5), sample(100, 5.1), sample(300, 5.3)];

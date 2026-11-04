@@ -3,7 +3,7 @@ import { guest } from '../lib/database.mjs';
 import { socketURL } from '../lib/socket.mjs';
 import { sleep, until } from '../lib/common.mjs';
 import { MAX_ATTEMPTS, reconnectDelay } from '../lib/reconnect-policy.mjs';
-import { peakPerSecond, stddev } from '../lib/stats.mjs';
+import { peakPerSecond, stddev, browserReconnectState } from '../lib/stats.mjs';
 
 export async function run(ctx) {
   return ctx.condition === 'browser-10' ? browserRun(ctx) : botRun(ctx);
@@ -87,7 +87,7 @@ async function browserRun({ cleanup, result, seed, smoke, restart }) {
     const identity = await guest(seed.room, `tab-${i}`);
     const state = await tab(browser, identity, result, cleanup);
     scriptedUser(state, cleanup, result);
-    records.push({ id: i, attempts: state.attempts });
+    records.push({ id: i, attempts: [], ws_log: [] });
     tabs.push(state);
     await enter(state, seed.room);
   }
@@ -97,13 +97,27 @@ async function browserRun({ cleanup, result, seed, smoke, restart }) {
   result.metrics.raw.outage_at = outageAt;
   const server = await restart();
   result.metrics.raw.listen_at = server.listenAt;
-  // Five source retries can last 31s total; 120s is a fixed upper bound.
-  await until(() => tabs.every(t => t.frames.some(f => f.t >= server.listenAt)) || Date.now() - outageAt >= 120000,
-    121000, 'browser reconnect completion');
-  const first = tabs.map(t => t.attempts.find(time => time >= outageAt)).map(t => t === undefined ? null : t - outageAt);
+  // This scenario has no autoplay metric; evaluating once per second is OK.
+  // Constructor logs include failed handshakes that page.on('websocket') omits.
+  let statuses;
+  do {
+    const logs = await Promise.all(tabs.map(t => t.page.evaluate(() => window.__wsLog ?? [])));
+    const now = Date.now();
+    statuses = logs.map(log => browserReconnectState(log, outageAt, server.listenAt, now, MAX_ATTEMPTS));
+    records.forEach((record, i) => {
+      record.ws_log = logs[i];
+      record.attempts = logs[i].map(entry => entry.created_at);
+    });
+    if (statuses.every(s => s.reconnected || s.gave_up) || now - outageAt >= 120000) break;
+    await sleep(Math.min(1000, outageAt + 120000 - now));
+  } while (true);
+  const first = statuses.map(s => s.attempts.length ? s.attempts[0] - outageAt : null);
   const valid = first.filter(t => t !== null);
   records.forEach((record, i) => { record.first_retry_ms = first[i]; });
   return { first_retry_range_ms: valid.length === count ? Math.max(...valid) - Math.min(...valid) : null,
     first_retry_stddev_ms: valid.length === count ? stddev(valid) : null,
-    missing_first_retry: count - valid.length, raw: result.metrics.raw };
+    missing_first_retry: count - valid.length,
+    tabs_reconnected: statuses.filter(s => s.reconnected).length,
+    tabs_gave_up: statuses.filter(s => s.gave_up).length,
+    attempts_per_tab: statuses.map(s => s.attempts.length), raw: result.metrics.raw };
 }

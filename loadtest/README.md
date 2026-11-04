@@ -68,7 +68,7 @@ python3 -m py_compile loadtest/server/run_server.py
 bash -n loadtest/scripts/db.sh loadtest/scripts/prepare_commit.sh
 ```
 
-단위 테스트는 중앙값, nearest-rank p75/p95, 보간·paused 제외, 2초 연속 동기화, 1초 구간 최고치, 두 재연결 공식 범위, 정확한 마커 집계, 재생 시작 후 일시정지 전환, summarize의 null 처리·주입 무효 회차·호스트 멈춤 무효 회차 집계를 검증한다.
+단위 테스트는 중앙값, nearest-rank p75/p95, 보간·paused 제외, 2초 연속 동기화, 1초 구간 최고치, 두 재연결 공식 범위, 정확한 마커 집계, 재생 시작 후 일시정지 전환, 500ms/2000ms 동기화 임계값, 클릭 전 활성화 오염, 클릭 기록 대조, WebSocket 실패 시도·포기 판정, summarize의 무효 회차 집계를 검증한다. 가짜 페이지와 JS VM으로 버튼 감지·좌표 클릭·WebSocket 래퍼도 검증하며 Chromium은 실행하지 않는다.
 
 봇만 스모크(브라우저를 실행하지 않음; `b86324b` 준비 필요):
 
@@ -115,8 +115,8 @@ node loadtest/summarize.mjs
 - message_burst: 게스트 브라우저의 채팅 조회 응답 완료와 로딩 UI 제거를 확인한다. Node 발신자 1개는 N개를 **대기 없이 연속 전송**, 대조군 Node 수신자 1개가 모두 받거나 120초 후, DOM이 3초 조용해지면 채팅 영역만 집계한다. 마커는 공백으로 나뉜 정확 토큰으로 세며 초과 등장 횟수를 duplicates로 기록한다. 스모크는 N=50만 사용한다.
 - history_race는 **지연 주입**이다. GET chats를 서버 전송 전에 보류하고 게스트 WebSocket 첫 수신을 확인한다. A 25개를 20ms 간격으로 보내 마지막 프레임을 확인한다. 조회를 서버에 보내 응답을 보류하고 A 포함/B 미포함을 확인한다. B 25개를 같은 간격으로 보내 마지막 프레임 확인 후 응답을 전달하고 12초 대기한다. OPTIONS는 그대로 통과한다. 두 번째부터의 GET은 `route.fallback()`으로 통과시키고 `extra_history_gets`로 세며 오류로 처리하지 않는다. 스모크는 각 5개/3초다. 조회 보류 중 WS 수신이 불가능하면 timeout과 순서 오류를 저장하고 중단한다.
 - reconnect 봇: 200개를 50ms마다 입장시키고 모두 연결된 뒤 10초 안정화한다. SIGTERM 후 종료를 확인하고 **고정 3초 뒤** 서버를 새로 시작한다. 전원 연결/포기 또는 장애 시작부터 120초까지 기록한다. 스모크는 10개/2초 안정화. 앱과 동일하게 onopen에서 카운터를 0으로 초기화하며 최대 재시도는 5회다. exponential은 `min(30000,1000*2^attempt)`, full-jitter는 `random()*min(30000,1000*2^attempt)`다. 근거는 `1b2e6c4:useWebSocket.ts:33,61,111-123`, `b86324b:useWebSocket.ts:32-42,95,112,176-190`. 1초 구간은 시도는 장애 시작, open은 서버 listen 기준의 고정 구간이다. 서버 listen 시각은 uvicorn이 bind를 마친 직후 Python 실행기가 기록한다. RSS는 측정하지 않는다.
-- reconnect 브라우저: 해당 커밋 프론트/서버에서 10개 컨텍스트를 연결하고 같은 재시작을 한다. `page.on('websocket')` 시각과 첫 재시도 분포를 기록한다. 스모크는 2개 컨텍스트. 브라우저 인스턴스는 공유하되 컨텍스트는 분리한다.
-- autoplay: 호스트는 late_join과 같은 UI 경로로 서버 재생 상태를 남기고 5초 대기한다. 게스트는 두 조건 모두 사용자 활성화 필요 정책. `all-blocked`는 init script로 사용자 활성화 전 play를 NotAllowedError로 거부하고, 미디어 요소의 `setAttribute('autoplay', ...)`와 `autoplay` setter를 무시하는 **주입**이며 저전력 모드 등을 모사한다. 활성화 뒤에는 원래 동작으로 전달하며 도구가 대신 play를 호출하지 않는다. 세 경로의 차단 횟수 합계를 `window.__blockedPlay`와 회차 지표 `blocked_play_calls`에 기록한다. `injection_effective`는 첫 실제 클릭 전(클릭이 없으면 전체 관찰 구간)에 재생 중 ct가 0.2초 이상 증가한 샘플이 없으면 true다. `muted-allowed`에서는 두 지표 모두 null이다. 요약 표는 `injection_effective`가 명시적으로 false인 회차 수를 표시한다. 30초까지 소리가 없으면 failed. 들리기 시작이 마감 직전이면 오차 측정에 필요한 2초만 추가 관찰하며 30초 성공 마감은 유지한다. 스모크도 환경별 1회/30초다.
+- reconnect 브라우저: 해당 커밋 프론트/서버에서 10개 컨텍스트를 연결하고 같은 재시작을 한다. init script가 네이티브 `window.WebSocket` 생성자를 Proxy로 감싸 생성·open·close 시각과 close code를 `window.__wsLog`에 기록한다. `new`, 정적 상수, `instanceof`와 연결 동작은 유지한다. 실패한 연결도 생성 시각으로 남으며 `page.on('websocket')`은 프레임 관찰에만 사용한다. 1초 간격으로 로그를 읽고 전원 재연결 또는 포기까지, 최대 120초 관찰한다. `tabs_reconnected`는 listen 이후 open이 있는 탭 수, `tabs_gave_up`은 outage 이후 생성 시도가 5개이고 마지막 close 후 1초 동안 이후 open이 없는 탭 수다. `attempts_per_tab`은 탭 순서대로 outage 이후 생성 시도 수를 담는다. `first_retry_range_ms`·`first_retry_stddev_ms`는 outage 이후 첫 생성 시각의 분포다. 스모크는 2개 컨텍스트. 브라우저 인스턴스는 공유하되 컨텍스트는 분리한다.
+- autoplay: 호스트는 late_join과 같은 UI 경로로 서버 재생 상태를 남기고 5초 대기한다. 게스트는 두 조건 모두 사용자 활성화 필요 정책. `all-blocked`는 init script로 사용자 활성화 전 play를 NotAllowedError로 거부하고, 미디어 요소의 `setAttribute('autoplay', ...)`와 `autoplay` setter를 무시하는 **주입**이며 저전력 모드 등을 모사한다. 활성화 뒤에는 원래 동작으로 전달하며 도구가 대신 play를 호출하지 않는다. 세 경로의 차단 횟수 합계를 `window.__blockedPlay`와 회차 지표 `blocked_play_calls`에 기록한다. `injection_effective`는 첫 실제 클릭 전(클릭이 없으면 전체 관찰 구간)에 재생 중 ct가 0.2초 이상 증가한 샘플이 없으면 true다. `muted-allowed`에서는 두 지표 모두 null이다. 요약 표는 `injection_effective`가 명시적으로 false인 회차 수를 표시한다. 30초까지 소리가 없으면 failed. 게스트 평가 없이 들림 2초 뒤 오차를 확보하기 위해 30초에 클릭을 종료하고 32.2초까지 고정으로 관찰한 뒤 데이터를 읽는다. 성공 판정 마감은 30초 그대로다. 스모크도 환경별 1회이며 같은 관찰 시간을 쓴다.
 
 ## 커밋별 UI와 sessionStorage 근거
 
@@ -131,7 +131,7 @@ node loadtest/summarize.mjs
 
 예: `8003014`의 120-135행, `b86324b`의 131-146행은 동기화/중앙 버튼, `b86324b`의 160-166행은 소리 켜기 버튼이다. 없는 버튼을 대체하거나 앱을 패치하지 않는다. 채팅 입력은 `input[placeholder="Message..."]`를 사용하며, 채팅 영역은 `div:has(> div > h2:text-is("Chat")) > div.scrollbar-hide.overflow-y-auto`로 Chat 제목이 있는 카드 안에서만 선택한다. `e7904b9`·`32cdc26`의 `components/ChatBoard.tsx:46-60`, `08eb0e5:45-59`, `b86324b:47-61` 모두 카드의 직계 헤더 div 안에 h2 Chat, 그 형제로 스크롤 div가 있는 동일 구조다. 대기열의 스크롤 영역은 선택하지 않는다. 로딩 중 직계 `div.h-full`은 기존과 같다.
 
-스크립트 사용자는 250ms마다 보이는 동기화/소리 켜기 버튼을 찾고 최초 확인 1000ms 후 실제 Playwright 클릭을 한다. 총 시도 상한은 5회이며 최초 확인·시도·실제 trusted click 시각과 성공 여부를 기록한다. **사용자 반응 시간 1000ms가 측정값에 포함된다.** 동기화 버튼을 우선하며 더 이상 보이지 않으면 예약을 취소한다.
+버튼 감지는 init script의 250ms 타이머가 수행한다. 보이는 동기화/소리 켜기 버튼의 종류와 중심 좌표가 달라질 때 `console.debug('__stage1_button', JSON.stringify(...))`로 내보낸다. Node는 콘솔 메시지의 `msg.text()`만 읽고 최초 확인 1000ms 뒤 최신 좌표에 `page.mouse.click(x,y)`를 보낸다. 총 시도 상한은 5회다. 감지를 위한 Node의 locator/evaluate와 exposeBinding/exposeFunction은 사용하지 않는다. 실제 클릭 시각·종류는 기존 trusted click 캡처 기록을 측정 종료 후 읽고 각 입력 시도의 시간 구간·종류와 대조해 성공 여부를 판단한다. **사용자 반응 시간 1000ms가 측정값에 포함된다.** 동기화 버튼을 우선하며 더 이상 보이지 않으면 예약을 취소한다.
 
 ## 원본, 요약과 계측 정의
 
@@ -141,11 +141,13 @@ node loadtest/summarize.mjs
 
 환경 JSON은 Node, Python, 실제 launch에서 얻은 Chromium 버전, CPU 모델·코어 수, 메모리, OS, 전용 Postgres 버전과 `SHOW timezone` 값(`postgres_timezone`), git HEAD와 기준 main, 실행 인자, 시작 부하 평균, Python 의존성을 기록한다. 봇만 실행한 환경의 실제 Chromium 버전은 null이고 Playwright manifest의 예상 버전은 별도 필드다. 브라우저를 실행하지 않고 버전을 만들어 쓰지 않는다.
 
-브라우저 init script는 100ms마다 첫 `audio,video`의 `{t: Date.now(), ct, paused, muted, volume}` 또는 `{t, none:true}`를 수집한다. 게스트 샘플 시각에서 호스트 위치를 선형 보간해 절대 오차(ms)를 구한다. 게스트와 보간 양 끝의 호스트가 모두 재생 중이어야 유효하다. 외삽하지 않는다. 250ms를 넘는 관측 공백·paused·미디어 없음은 2초 연속 동기화 판정을 끊는다. `sync_time_ms`는 오차 500ms 미만이 2초 유지되는 구간의 시작 시각이다. 지정 시점 오차는 ±200ms 안의 가장 가까운 샘플이며 없으면 null이다.
+브라우저 init script는 100ms마다 첫 `audio,video`의 `{t: Date.now(), ct, paused, muted, volume, act}` 또는 `{t, none:true, act}`를 수집한다. 게스트 샘플 시각에서 호스트 위치를 선형 보간해 절대 오차(ms)를 구한다. 게스트와 보간 양 끝의 호스트가 모두 재생 중이어야 유효하다. 외삽하지 않는다. 250ms를 넘는 관측 공백·paused·미디어 없음은 2초 연속 동기화 판정을 끊는다. `act`는 `navigator.userActivation.hasBeenActive`다. `sync_time_ms`는 오차 500ms 미만, 추가 지표 `sync_time_2s_ms`는 오차 2000ms 미만이 각각 2초 유지되는 구간의 시작 시각이다. 2000ms는 앱의 재생 시작 시 보정 기준값이고, 500ms는 자체 목표값이다. 기존 500ms 기준은 그대로 유지한다. late_join의 `ws_reconnects`는 측정 종료 후 읽은 `__wsLog`의 생성 시도 수에서 첫 연결 1개를 뺀 값이다. 지정 시점 오차는 ±200ms 안의 가장 가까운 샘플이며 없으면 null이다.
 
 late_join의 마지막 10초 오차 p50/p75/p95는 유효 샘플에서 계산한다. autoplay는 재생 중인 샘플에서 ct가 0.2초 이상 증가한 첫 확인 시각을 사용하며 audible은 추가로 muted=false, volume>0이어야 한다. 모든 회차별 값은 그대로 저장하고 요약에서 회차 중앙값과 nearest-rank p75/p95를 구한다. 회차가 5개면 nearest-rank p95는 최댓값과 같다. null/미기록은 0으로 바꾸지 않으며 결측 회차 수를 표시한다. 실패한 회차도 원본과 회차 수에 남긴다.
 
-late_join과 autoplay는 `host_unexpected_pauses`, `guest_unexpected_pauses`를 기록한다. 호스트는 `readyHost`의 마지막 실제 재생 클릭 시각(`raw.host_last_play_click_at`) 이후 첫 `paused=false` 샘플부터 `false → true` 전환만 센다. 게스트도 첫 재생 샘플 이전의 초기 paused 상태는 세지 않는다. 미디어 요소가 없는 구간을 가로질러 전환을 추정하지 않는다. `host_unexpected_pauses > 0`인 회차는 모든 지표의 중앙값·p75·p95에서 제외하고 요약 표의 「호스트 멈춤 무효 회차」로 표시한다. 원본은 그대로 유지하며 삭제하거나 자동 재시도하지 않는다. 결측 회차는 이 제외 후의 회차에서 센다. 게스트 멈춤은 표시만 하며 집계 제외 사유가 아니다.
+late_join과 autoplay는 `host_unexpected_pauses`, `guest_unexpected_pauses`를 기록한다. 호스트는 `readyHost`의 마지막 실제 재생 클릭 시각(`raw.host_last_play_click_at`) 이후 첫 `paused=false` 샘플부터 `false → true` 전환만 센다. 게스트도 첫 재생 샘플 이전의 초기 paused 상태는 세지 않는다. 미디어 요소가 없는 구간을 가로질러 전환을 추정하지 않는다. `host_unexpected_pauses > 0`인 회차는 모든 지표의 중앙값·p75·p95에서 제외하고 요약 표의 「호스트 멈춤 무효 회차」로 표시한다. `activation_before_first_click`은 첫 trusted click 전(클릭이 없으면 측정 종료 전) 샘플에 `act=true`가 있으면 true이며, true인 회차도 같은 집계에서 제외하고 「활성화 오염 무효 회차」로 표시한다. 두 무효 사유가 겹치면 각 사유의 건수에 표시하되 통계에서는 한 번만 제외한다. 원본은 그대로 유지하며 삭제하거나 자동 재시도하지 않는다. 결측 회차는 이 제외 후의 회차에서 센다. 게스트 멈춤은 표시만 하며 집계 제외 사유가 아니다.
+
+late_join과 autoplay의 게스트는 관찰 중 Node가 페이지를 평가하지 않는다. `enter`의 goto 이후에는 콘솔 수신·대기·실제 mouse 입력만 수행하며, 관찰 종료 후 `readObservation`으로 샘플·클릭·WebSocket 로그를 한꺼번에 읽는다. autoplay의 들림 판정과 대기 계산에 관찰 중 샘플 읽기를 사용하지 않는다. 실패 회차 cleanup의 데이터 읽기도 그 회차 관찰을 중단한 뒤 수행한다.
 
 ## 브라우저 스모크 확인 항목과 한계
 
@@ -153,6 +155,7 @@ late_join과 autoplay는 `host_unexpected_pauses`, `guest_unexpected_pauses`를 
 - 호스트 UI pause/play의 실제 `sync` 전송, 게스트 `sync` 수신과 queue 응답, 클릭의 trusted 시각, 외부 요청 차단 수를 원본에서 확인한다.
 - history_race 원본의 A 수신 → 응답 보류 → B 수신 → 전달 순서와 스냅샷을 확인한다. 순서를 충족하지 못하면 결과를 정상 측정으로 해석하지 않는다.
 - 브라우저 SIGTRAP 제약 때문에 이 샌드박스에서는 브라우저 시나리오를 실행하지 않았다. Claude가 샌드박스 밖에서 스모크 로그를 검토해야 한다.
+- message_burst와 history_race의 관찰자는 Playwright 조작으로 활성화된 상태다. 이 두 시나리오는 재생 지표를 측정하지 않으며 chatReady/chatText 등의 조작은 그대로 사용한다.
 - 봇은 한 Node 프로세스의 이벤트 루프·네트워크·CPU 스케줄링 한계가 포함된다. 실제 사용자 200명의 브라우저 부하를 재현하지 않는다. 소수 실제 브라우저 검증은 공식 동작 확인용이다.
 - 모든 브라우저에 `--mute-audio`와 `--disable-features=HardwareMediaKeyHandling`을 고정 적용한다. `--mute-audio`는 출력만 끄며 측정에 쓰는 `el.muted`, `el.volume`은 앱이 정한 값 그대로다. 미디어 키 제어 비활성화는 원인이 확정되지 않은 호스트 멈춤을 방지하기 위한 설정이며, 멈춤 원인을 확정하는 근거는 아니다.
 - 로컬 영상 파일과 동일 머신 시계의 결과다. 실제 서비스 경로는 YouTube iframe이지만 시험은 로컬 영상 파일이므로 YouTube의 버퍼링과 `handleUnmute`의 YouTube 분기는 재지 않는다. 원격망/운영 부하, 실제 저전력 모드, 확성기에서 소리가 나는지는 재현하지 않는다. audible은 미디어 요소 상태를 기준으로 한다. 무음 허용 여부는 Chromium 정책에도 좌우된다.

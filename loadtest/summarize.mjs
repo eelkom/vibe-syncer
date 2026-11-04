@@ -4,10 +4,10 @@ import { pathToFileURL } from 'node:url';
 import { ROOT } from './lib/common.mjs';
 import { median, percentile } from './lib/stats.mjs';
 const fields = {
-  late_join: ['sync_time_ms', 'err_at_5s_ms', 'err_at_10s_ms', 'err_at_20s_ms', 'err_p50_ms', 'err_p75_ms', 'err_p95_ms', 'clicks_count', 'first_sync_frame_ms', 'queue_response_ms', 'ws_reconnects', 'guest_console_errors', 'host_unexpected_pauses', 'guest_unexpected_pauses'],
+  late_join: ['sync_time_ms', 'sync_time_2s_ms', 'err_at_5s_ms', 'err_at_10s_ms', 'err_at_20s_ms', 'err_p50_ms', 'err_p75_ms', 'err_p95_ms', 'clicks_count', 'first_sync_frame_ms', 'queue_response_ms', 'ws_reconnects', 'guest_console_errors', 'host_unexpected_pauses', 'guest_unexpected_pauses'],
   message_burst: ['n', 'control_received', 'on_screen_unique', 'delivery_ratio', 'missing_count', 'duplicates', 'elapsed_ms'],
   history_race: ['lost_a', 'lost_b', 'dup_a', 'dup_b', 'lost_total', 'dup_total', 'on_screen_total', 'extra_history_gets'],
-  reconnect: ['peak_attempts_per_s', 'peak_opens_per_s', 'time_to_all_reconnected_ms', 'reconnected', 'gave_up', 'pending', 'first_retry_range_ms', 'first_retry_stddev_ms', 'missing_first_retry'],
+  reconnect: ['peak_attempts_per_s', 'peak_opens_per_s', 'time_to_all_reconnected_ms', 'reconnected', 'gave_up', 'pending', 'first_retry_range_ms', 'first_retry_stddev_ms', 'missing_first_retry', 'tabs_reconnected', 'tabs_gave_up'],
   autoplay: ['first_playback_ms', 'audible_ms', 'clicks_count', 'err_after_audible_ms', 'blocked_play_calls', 'host_unexpected_pauses', 'guest_unexpected_pauses'],
 };
 function value(run, field) {
@@ -23,17 +23,19 @@ export function summarizeRuns(runs) {
     groups.get(key).push(run);
   }
   return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([key, group]) => {
-    const eligible = group.filter(r => !(r.metrics?.host_unexpected_pauses > 0));
+    const eligible = group.filter(r => !(r.metrics?.host_unexpected_pauses > 0)
+      && r.metrics?.activation_before_first_click !== true);
     const keys = fields[group[0].scenario] ?? [];
     const applicable = group[0].scenario === 'reconnect'
       ? keys.filter(k => group[0].condition === 'browser-10'
-        ? ['first_retry_range_ms', 'first_retry_stddev_ms', 'missing_first_retry'].includes(k)
-        : !['first_retry_range_ms', 'first_retry_stddev_ms', 'missing_first_retry'].includes(k))
+        ? ['first_retry_range_ms', 'first_retry_stddev_ms', 'missing_first_retry', 'tabs_reconnected', 'tabs_gave_up'].includes(k)
+        : !['first_retry_range_ms', 'first_retry_stddev_ms', 'missing_first_retry', 'tabs_reconnected', 'tabs_gave_up'].includes(k))
       : keys;
     return { key, runs: group.length, script_failed: group.filter(r => !r.ok).length,
       autoplay_failed: group.filter(r => r.metrics?.failed === true).length,
       injection_ineffective: group.filter(r => r.metrics?.injection_effective === false).length,
-      host_pause_invalid: group.length - eligible.length,
+      host_pause_invalid: group.filter(r => r.metrics?.host_unexpected_pauses > 0).length,
+      activation_invalid: group.filter(r => r.metrics?.activation_before_first_click === true).length,
       metrics: Object.fromEntries(applicable.map(k => {
         const values = eligible.map(r => value(r, k));
         const valid = values.filter(v => typeof v === 'number' && Number.isFinite(v));
@@ -58,11 +60,12 @@ export function markdown(groups) {
   const lines = [
     '# Stage 1 측정 요약', '',
     '회차별 값의 중앙값 및 nearest-rank p75/p95. 회차가 5개면 nearest-rank p95는 최댓값과 같다. null/미기록은 제외하고 결측 회차 수로 표시한다. 실패 회차도 원본과 회차 수에 남긴다.', '',
-    'host_unexpected_pauses > 0인 회차는 모든 지표의 중앙값·p75·p95 집계에서 제외하고 「호스트 멈춤 무효 회차」로 센다. 원본은 유지하며 삭제·자동 재시도하지 않는다. 결측 회차는 이 제외 후의 회차에서 센다. 게스트 멈춤만으로는 제외하지 않는다.', '',
+    'host_unexpected_pauses > 0 또는 activation_before_first_click = true인 회차는 모든 지표의 중앙값·p75·p95 집계에서 제외하고 「호스트 멈춤 무효 회차」와 「활성화 오염 무효 회차」로 각각 센다(두 건수는 중복 가능). 원본은 유지하며 삭제·자동 재시도하지 않는다. 결측 회차는 이 제외 후의 회차에서 센다. 게스트 멈춤만으로는 제외하지 않는다.', '',
+    'sync_time_ms는 오차 500ms 미만, sync_time_2s_ms는 오차 2000ms 미만이 2초 유지되는 구간의 시작 시각이다. 2000ms는 앱의 재생 시작 시 보정 기준값이고, 500ms는 자체 목표값이다.', '',
     'history_race: 조회 요청과 응답에 **지연 주입**. autoplay/all-blocked: 사용자 활성화 전 play 및 autoplay 속성 차단 주입으로 저전력 모드 등을 모사한다. 사용자 반응 시간 1000ms가 결과에 포함된다. 주입 무효 회차는 injection_effective가 명시적으로 false인 회차만 센다.', '',
-    '| 시나리오/커밋/조건 | 회차 | 스크립트 실패 | 소리 재생 실패 | 주입 무효 회차 | 호스트 멈춤 무효 회차 |',
-    '|---|---:|---:|---:|---:|---:|',
-    ...groups.map(g => `| ${g.key} | ${g.runs} | ${g.script_failed} | ${g.autoplay_failed} | ${g.injection_ineffective} | ${g.host_pause_invalid} |`), '',
+    '| 시나리오/커밋/조건 | 회차 | 스크립트 실패 | 소리 재생 실패 | 주입 무효 회차 | 호스트 멈춤 무효 회차 | 활성화 오염 무효 회차 |',
+    '|---|---:|---:|---:|---:|---:|---:|',
+    ...groups.map(g => `| ${g.key} | ${g.runs} | ${g.script_failed} | ${g.autoplay_failed} | ${g.injection_ineffective} | ${g.host_pause_invalid} | ${g.activation_invalid} |`), '',
     '| 시나리오/커밋/조건 | 지표 | 회차 중앙값 | 회차 p75 | 회차 p95 | 유효 회차 | 결측 회차 |',
     '|---|---|---:|---:|---:|---:|---:|',
   ];

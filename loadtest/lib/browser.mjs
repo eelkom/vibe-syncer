@@ -1,5 +1,6 @@
 import { ROOT, FRONT, sleep, until } from './common.mjs';
 import path from 'node:path';
+import { reconcileClicks } from './stats.mjs';
 process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(ROOT, '.pw-browsers');
 const { chromium } = await import('playwright');
 // Every inspected commit's MusicPlayer.tsx: central play/pause = button.h-14;
@@ -37,6 +38,42 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
     window.__userClickEvents = [];
     window.__lastPlaybackClickAt = null;
     window.__blockedPlay = 0;
+    window.__wsLog = [];
+    const NativeWebSocket = window.WebSocket;
+    window.WebSocket = new Proxy(NativeWebSocket, {
+      construct(target, args, newTarget) {
+        const record = { created_at: Date.now(), open_at: null, close_at: null, code: null };
+        window.__wsLog.push(record);
+        const socket = Reflect.construct(target, args, newTarget);
+        socket.addEventListener('open', () => { record.open_at = Date.now(); });
+        socket.addEventListener('close', event => { record.close_at = Date.now(); record.code = event.code; });
+        return socket;
+      },
+    });
+    // Detect in the page: Node-side locator/evaluate calls would activate it.
+    let previousButton = '';
+    setInterval(() => {
+      const visible = button => {
+        const rect = button.getBoundingClientRect(), style = getComputedStyle(button);
+        if (!rect.width || !rect.height || style.visibility === 'hidden' || style.visibility === 'collapse' || style.display === 'none') return null;
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      };
+      let button = null;
+      for (const el of document.querySelectorAll('button.animate-pulse')) {
+        const center = visible(el);
+        if (center) { button = { kind: 'sync', ...center }; break; }
+      }
+      if (!button) for (const el of document.querySelectorAll('button')) {
+        if (el.textContent.trim() !== '탭하여 소리 켜기') continue;
+        const center = visible(el);
+        if (center) { button = { kind: 'unmute', ...center }; break; }
+      }
+      const current = JSON.stringify(button);
+      if (current !== previousButton) {
+        previousButton = current;
+        console.debug('__stage1_button', JSON.stringify({ t: Date.now(), button }));
+      }
+    }, 250);
     document.addEventListener('click', event => {
       const button = event.target instanceof Element ? event.target.closest('button') : null;
       const kind = button?.classList.contains('animate-pulse') ? 'sync'
@@ -47,7 +84,8 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
     setInterval(() => {
       const el = document.querySelector('audio,video');
       window.__samples.push(el ? { t: Date.now(), ct: el.currentTime, paused: el.paused,
-        muted: el.muted, volume: el.volume } : { t: Date.now(), none: true });
+        muted: el.muted, volume: el.volume, act: navigator.userActivation.hasBeenActive }
+        : { t: Date.now(), none: true, act: navigator.userActivation.hasBeenActive });
     }, 100);
     if (allBlocked) {
       const play = HTMLMediaElement.prototype.play;
@@ -83,7 +121,7 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
     }
   }, { user, allBlocked });
   const page = await context.newPage();
-  const state = { page, frames: [], sent: [], attempts: [], consoleErrors: [], responses: [], clicks: [] };
+  const state = { page, frames: [], sent: [], attempts: [], consoleErrors: [], responses: [], clicks: [], reconciledClicks: 0 };
   page.on('request', request => {
     if (new URL(request.url()).hostname !== '127.0.0.1') result.blocked_external_requests++;
   });
@@ -108,10 +146,10 @@ export async function tab(browser, user, result, cleanup, allBlocked = false) {
   // Capture even a failed scenario's partial samples/frames before context close.
   cleanup.push(async () => {
     result.browser_artifacts ??= [];
-    let mediaSamples = [];
-    try { mediaSamples = await samples(state); } catch (error) { result.errors.push(`sample capture: ${error.message}`); }
-    result.browser_artifacts.push({ role: user.nickname, samples: mediaSamples, frames: state.frames,
-      sent: state.sent, attempts: state.attempts, console_errors: state.consoleErrors,
+    let observation = {};
+    try { observation = await readObservation(state, result); } catch (error) { result.errors.push(`sample capture: ${error.message}`); }
+    result.browser_artifacts.push({ role: user.nickname, ...observation, frames: state.frames,
+      sent: state.sent, attempts: (observation.ws_log ?? []).map(entry => entry.created_at), console_errors: state.consoleErrors,
       responses: state.responses, clicks: state.clicks, t0: state.t0 ?? null });
   });
   return state;
@@ -121,31 +159,67 @@ export async function enter(state, room) {
   await state.page.goto(`${FRONT}/room/${room.room_code}`, { waitUntil: 'domcontentloaded' });
 }
 export async function samples(state) { return state.page.evaluate(() => window.__samples ?? []); }
+// Call only after observation ends (or an aborted run reaches cleanup).
+export async function readObservation(state, result) {
+  const observation = await state.page.evaluate(() => ({
+    samples: window.__samples ?? [], user_click_events: window.__userClickEvents ?? [],
+    ws_log: window.__wsLog ?? [], blocked_play_calls: window.__blockedPlay ?? 0,
+  }));
+  const pending = state.clicks.slice(state.reconciledClicks);
+  const checked = reconcileClicks(pending, observation.user_click_events);
+  checked.forEach((click, i) => {
+    Object.assign(pending[i], click);
+    if (!click.ok) result.errors.push(`scripted click: no matching trusted ${click.kind} event at ${click.attempted_at}${click.input_error ? `; ${click.input_error}` : ''}`);
+  });
+  state.reconciledClicks = state.clicks.length;
+  return observation;
+}
 export function scriptedUser(state, cleanup, result) {
-  let stopped = false;
-  const task = (async () => {
-    let pending = null;
-    while (!stopped && state.clicks.length < 5) {
-      const sync = state.page.locator(selectors.sync).first();
-      const unmute = state.page.getByRole('button', { name: '탭하여 소리 켜기', exact: true });
-      const kind = await sync.isVisible() ? 'sync' : await unmute.isVisible() ? 'unmute' : null;
-      if (!kind) pending = null;
-      else if (!pending || pending.kind !== kind) pending = { kind, firstSeen: Date.now() };
-      else if (Date.now() - pending.firstSeen >= 1000) {
-        const click = { kind, first_seen: pending.firstSeen, attempted_at: Date.now(), t: null, ok: false };
-        state.clicks.push(click);
-        try {
-          await (kind === 'sync' ? sync : unmute).click({ timeout: 1000 });
-          click.t = await state.page.evaluate(() => window.__userClickEvents.at(-1)?.t ?? null);
-          click.ok = true;
-        }
-        catch (err) { result.errors.push(`scripted click: ${err.message}`); }
-        pending = null;
+  let stopped = false, latest = null, pending = null, timer = null, inputRunning = false;
+  let inFlight = Promise.resolve();
+  const schedule = () => {
+    clearTimeout(timer);
+    if (stopped || inputRunning || !pending || state.clicks.length >= 5) return;
+    timer = setTimeout(() => {
+      if (stopped || !latest || !pending) return;
+      if (Date.now() < pending.firstSeen + 1000) { schedule(); return; }
+      // Only actual mouse input touches the page. Coordinates arrive via
+      // console text; no locator/evaluate/binding is used to detect buttons.
+      const click = { kind: pending.kind, first_seen: pending.firstSeen, attempted_at: Date.now(),
+        x: latest.x, y: latest.y, t: null, ok: null };
+      state.clicks.push(click);
+      pending = null;
+      inputRunning = true;
+      inFlight = (async () => {
+        try { await state.page.mouse.click(click.x, click.y); }
+        catch (error) { click.input_error = error.message; }
+        click.input_finished_at = Date.now();
+        inputRunning = false;
+        if (!pending && latest) pending = { kind: latest.kind, firstSeen: Date.now() };
+        schedule();
+      })().catch(error => { result.errors.push(`scripted user: ${error.message}`); });
+    }, Math.max(0, pending.firstSeen + 1000 - Date.now()));
+  };
+  const onConsole = msg => {
+    const text = msg.text();
+    if (!text.startsWith('__stage1_button ')) return;
+    try {
+      const observation = JSON.parse(text.slice('__stage1_button '.length));
+      latest = observation.button;
+      if (!latest) { pending = null; clearTimeout(timer); }
+      else if (pending?.kind !== latest.kind) {
+        pending = { kind: latest.kind, firstSeen: observation.t };
+        schedule();
       }
-      await sleep(250);
-    }
-  })().catch(err => { result.errors.push(`scripted user: ${err.message}`); });
-  const stop = async () => { stopped = true; await task; };
+    } catch (error) { result.errors.push(`button observation: ${error.message}`); }
+  };
+  state.page.on('console', onConsole);
+  const stop = async () => {
+    stopped = true;
+    clearTimeout(timer);
+    state.page.off('console', onConsole);
+    await inFlight;
+  };
   cleanup.push(stop);
   return stop;
 }
