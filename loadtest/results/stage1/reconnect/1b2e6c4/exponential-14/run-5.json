@@ -1,0 +1,938 @@
+{
+  "scenario": "reconnect",
+  "commit": "1b2e6c4",
+  "commit_full": "1b2e6c4dc64008debcdb14bf8ebdc3cff1a42f36",
+  "server_commit": "b86324b",
+  "condition": "exponential-14",
+  "run": 5,
+  "started_at": "2026-11-04T09:25:02.963Z",
+  "measurement_pool_size": null,
+  "environment": "results/stage1/env-2026-11-04T09-23-41.498Z.json",
+  "smoke": false,
+  "metrics": {
+    "peak_attempts_per_s": 14,
+    "peak_opens_per_s": 14,
+    "time_to_all_reconnected_ms": 1298,
+    "reconnected": 14,
+    "gave_up": 0,
+    "pending": 0,
+    "bot_count": 14,
+    "raw": {
+      "bots": [
+        {
+          "id": 0,
+          "attempts": [
+            1793784304811,
+            1793784316544,
+            1793784318546,
+            1793784322547
+          ],
+          "opens": [
+            1793784304814,
+            1793784322587
+          ],
+          "closes": [
+            {
+              "t": 1793784315543,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316545,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318546,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315543,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316545,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318546,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316545,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318546,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 44,
+          "gave_up_at": null
+        },
+        {
+          "id": 1,
+          "attempts": [
+            1793784304861,
+            1793784316548,
+            1793784318549,
+            1793784322550
+          ],
+          "opens": [
+            1793784304866,
+            1793784322614
+          ],
+          "closes": [
+            {
+              "t": 1793784315548,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316548,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318549,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315548,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316548,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318549,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316548,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318549,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 32,
+          "gave_up_at": null
+        },
+        {
+          "id": 2,
+          "attempts": [
+            1793784304911,
+            1793784316545,
+            1793784318546,
+            1793784322547
+          ],
+          "opens": [
+            1793784304916,
+            1793784322597
+          ],
+          "closes": [
+            {
+              "t": 1793784315546,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316545,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318546,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315546,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316545,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318546,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316545,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318546,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 36,
+          "gave_up_at": null
+        },
+        {
+          "id": 3,
+          "attempts": [
+            1793784304960,
+            1793784316537,
+            1793784318540,
+            1793784322542
+          ],
+          "opens": [
+            1793784304965,
+            1793784322564
+          ],
+          "closes": [
+            {
+              "t": 1793784315536,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316538,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318540,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315536,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316538,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318540,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316538,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318540,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 46,
+          "gave_up_at": null
+        },
+        {
+          "id": 4,
+          "attempts": [
+            1793784305010,
+            1793784316551,
+            1793784318551,
+            1793784322551
+          ],
+          "opens": [
+            1793784305017,
+            1793784322624
+          ],
+          "closes": [
+            {
+              "t": 1793784315550,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316551,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318551,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315550,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316551,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318551,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316551,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318551,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 22,
+          "gave_up_at": null
+        },
+        {
+          "id": 5,
+          "attempts": [
+            1793784305060,
+            1793784316549,
+            1793784318549,
+            1793784322550
+          ],
+          "opens": [
+            1793784305067,
+            1793784322619
+          ],
+          "closes": [
+            {
+              "t": 1793784315549,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316549,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318549,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315549,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316549,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318549,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316549,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318549,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 22,
+          "gave_up_at": null
+        },
+        {
+          "id": 6,
+          "attempts": [
+            1793784305111,
+            1793784316541,
+            1793784318541,
+            1793784322542
+          ],
+          "opens": [
+            1793784305119,
+            1793784322574
+          ],
+          "closes": [
+            {
+              "t": 1793784315540,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316541,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318541,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315540,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316541,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318541,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316541,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318541,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 36,
+          "gave_up_at": null
+        },
+        {
+          "id": 7,
+          "attempts": [
+            1793784305161,
+            1793784316541,
+            1793784318541,
+            1793784322542
+          ],
+          "opens": [
+            1793784305169,
+            1793784322582
+          ],
+          "closes": [
+            {
+              "t": 1793784315542,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316541,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318541,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315542,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316541,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318541,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316541,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318541,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 32,
+          "gave_up_at": null
+        },
+        {
+          "id": 8,
+          "attempts": [
+            1793784305211,
+            1793784316546,
+            1793784318547,
+            1793784322547
+          ],
+          "opens": [
+            1793784305219,
+            1793784322603
+          ],
+          "closes": [
+            {
+              "t": 1793784315546,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316547,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318547,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315546,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316547,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318547,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316547,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318547,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 22,
+          "gave_up_at": null
+        },
+        {
+          "id": 9,
+          "attempts": [
+            1793784305261,
+            1793784316537,
+            1793784318539,
+            1793784322541
+          ],
+          "opens": [
+            1793784305269,
+            1793784322558
+          ],
+          "closes": [
+            {
+              "t": 1793784315535,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316537,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318539,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315535,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316537,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318539,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316537,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318539,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 36,
+          "gave_up_at": null
+        },
+        {
+          "id": 10,
+          "attempts": [
+            1793784305311,
+            1793784316547,
+            1793784318547,
+            1793784322547
+          ],
+          "opens": [
+            1793784305319,
+            1793784322609
+          ],
+          "closes": [
+            {
+              "t": 1793784315547,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316548,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318547,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315547,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316548,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318547,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316548,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318547,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 16,
+          "gave_up_at": null
+        },
+        {
+          "id": 11,
+          "attempts": [
+            1793784305360,
+            1793784316534,
+            1793784318537,
+            1793784322540
+          ],
+          "opens": [
+            1793784305368,
+            1793784322551
+          ],
+          "closes": [
+            {
+              "t": 1793784315535,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316536,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318539,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315535,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316536,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318539,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316536,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318539,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 34,
+          "gave_up_at": null
+        },
+        {
+          "id": 12,
+          "attempts": [
+            1793784305411,
+            1793784316538,
+            1793784318540,
+            1793784322542
+          ],
+          "opens": [
+            1793784305419,
+            1793784322568
+          ],
+          "closes": [
+            {
+              "t": 1793784315538,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316538,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318540,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315538,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316538,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318540,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316538,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318540,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 26,
+          "gave_up_at": null
+        },
+        {
+          "id": 13,
+          "attempts": [
+            1793784305461,
+            1793784316544,
+            1793784318546,
+            1793784322547
+          ],
+          "opens": [
+            1793784305469,
+            1793784322592
+          ],
+          "closes": [
+            {
+              "t": 1793784315544,
+              "code": 1012,
+              "reason": ""
+            },
+            {
+              "t": 1793784316545,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784318546,
+              "code": 1006,
+              "reason": ""
+            },
+            {
+              "t": 1793784322644,
+              "code": 1006,
+              "reason": ""
+            }
+          ],
+          "delays": [
+            {
+              "t": 1793784315544,
+              "attempt": 0,
+              "delay": 1000
+            },
+            {
+              "t": 1793784316545,
+              "attempt": 1,
+              "delay": 2000
+            },
+            {
+              "t": 1793784318546,
+              "attempt": 2,
+              "delay": 4000
+            }
+          ],
+          "errors": [
+            {
+              "t": 1793784316545,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            },
+            {
+              "t": 1793784318546,
+              "message": "connect ECONNREFUSED 127.0.0.1:18000"
+            }
+          ],
+          "received_frames": 16,
+          "gave_up_at": null
+        }
+      ],
+      "outage_at": 1793784315514,
+      "listen_at": 1793784321326
+    },
+    "peak_attempts_rolling_1s": 14,
+    "peak_opens_rolling_1s": 14
+  },
+  "blocked_external_requests": 0,
+  "errors": [],
+  "ok": true,
+  "server_logs": [
+    ".logs/server-loadtest_reconnect_1b2e6c4_5-8670.log",
+    ".logs/server-loadtest_reconnect_1b2e6c4_5-8702.log"
+  ],
+  "server_restart": {
+    "exited_at": 1793784315637,
+    "fixed_wait_ms": 3000,
+    "listen_at": 1793784321326
+  },
+  "finished_at": "2026-11-04T09:25:22.874Z"
+}

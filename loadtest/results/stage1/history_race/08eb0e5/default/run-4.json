@@ -1,0 +1,2623 @@
+{
+  "scenario": "history_race",
+  "commit": "08eb0e5",
+  "commit_full": "08eb0e573fbfdbeb64dad81bcb1fa062e85fb5c1",
+  "server_commit": "08eb0e5",
+  "condition": "default",
+  "run": 4,
+  "started_at": "2026-11-04T08:51:36.526Z",
+  "environment": "results/stage1/env-2026-11-04T08-31-18.999Z.json",
+  "smoke": false,
+  "metrics": {
+    "lost_a": 0,
+    "lost_b": 25,
+    "dup_a": 0,
+    "dup_b": 0,
+    "lost_total": 25,
+    "dup_total": 0,
+    "on_screen_total": 25,
+    "extra_history_gets": 0,
+    "injection": "지연 주입: GET /chats 서버 전송 전 및 응답 전달 전 보류",
+    "raw": {
+      "events": [
+        {
+          "event": "query-held-before-server",
+          "t": 1793782298902
+        },
+        {
+          "event": "A-received",
+          "t": 1793782299419
+        },
+        {
+          "event": "query-response-held",
+          "t": 1793782299425
+        },
+        {
+          "event": "B-received",
+          "t": 1793782299948
+        },
+        {
+          "event": "query-response-delivered",
+          "t": 1793782299948
+        }
+      ],
+      "snapshot": {
+        "status": 200,
+        "body": "[{\"id\":1,\"room_id\":1,\"user_id\":0,\"username\":\"🤖 VibeBot\",\"message\":\"[VibeBot] Stage1 fixed welcome.\",\"created_at\":\"2026-11-04T08:51:38.767004Z\"},{\"id\":3,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-1\",\"created_at\":\"2026-11-04T08:51:38.771409Z\"},{\"id\":2,\"room_id\":1,\"user_id\":0,\"username\":\"🤖 VibeBot\",\"message\":\"[VibeBot] Stage1 fixed welcome.\",\"created_at\":\"2026-11-04T08:51:38.853270Z\"},{\"id\":4,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-2\",\"created_at\":\"2026-11-04T08:51:38.904300Z\"},{\"id\":5,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-3\",\"created_at\":\"2026-11-04T08:51:38.924990Z\"},{\"id\":6,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-4\",\"created_at\":\"2026-11-04T08:51:38.944853Z\"},{\"id\":7,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-5\",\"created_at\":\"2026-11-04T08:51:38.965531Z\"},{\"id\":8,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-6\",\"created_at\":\"2026-11-04T08:51:38.985305Z\"},{\"id\":9,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-7\",\"created_at\":\"2026-11-04T08:51:39.005716Z\"},{\"id\":10,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-8\",\"created_at\":\"2026-11-04T08:51:39.025471Z\"},{\"id\":11,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-9\",\"created_at\":\"2026-11-04T08:51:39.045897Z\"},{\"id\":12,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-10\",\"created_at\":\"2026-11-04T08:51:39.066855Z\"},{\"id\":13,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-11\",\"created_at\":\"2026-11-04T08:51:39.091166Z\"},{\"id\":14,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-12\",\"created_at\":\"2026-11-04T08:51:39.106894Z\"},{\"id\":15,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-13\",\"created_at\":\"2026-11-04T08:51:39.127592Z\"},{\"id\":16,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-14\",\"created_at\":\"2026-11-04T08:51:39.148379Z\"},{\"id\":17,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-15\",\"created_at\":\"2026-11-04T08:51:39.169046Z\"},{\"id\":18,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-16\",\"created_at\":\"2026-11-04T08:51:39.192249Z\"},{\"id\":19,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-17\",\"created_at\":\"2026-11-04T08:51:39.211787Z\"},{\"id\":20,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-18\",\"created_at\":\"2026-11-04T08:51:39.232985Z\"},{\"id\":21,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-19\",\"created_at\":\"2026-11-04T08:51:39.253775Z\"},{\"id\":22,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-20\",\"created_at\":\"2026-11-04T08:51:39.274216Z\"},{\"id\":23,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-21\",\"created_at\":\"2026-11-04T08:51:39.295179Z\"},{\"id\":24,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-22\",\"created_at\":\"2026-11-04T08:51:39.316032Z\"},{\"id\":25,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-23\",\"created_at\":\"2026-11-04T08:51:39.336888Z\"},{\"id\":26,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-24\",\"created_at\":\"2026-11-04T08:51:39.358320Z\"},{\"id\":27,\"room_id\":1,\"user_id\":3,\"username\":\"sender\",\"message\":\"a-25\",\"created_at\":\"2026-11-04T08:51:39.378936Z\"}]"
+      },
+      "observer_frames": [
+        {
+          "t": 1793782298858,
+          "data": {
+            "type": "system",
+            "message": "observer has joined the room."
+          }
+        },
+        {
+          "t": 1793782298861,
+          "data": {
+            "type": "chat",
+            "id": 2,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:51:38.853270+00:00"
+          }
+        },
+        {
+          "t": 1793782298905,
+          "data": {
+            "type": "chat",
+            "id": 3,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-1",
+            "created_at": "2026-11-04T08:51:38.771409+00:00"
+          }
+        },
+        {
+          "t": 1793782298926,
+          "data": {
+            "type": "chat",
+            "id": 4,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-2",
+            "created_at": "2026-11-04T08:51:38.904300+00:00"
+          }
+        },
+        {
+          "t": 1793782298945,
+          "data": {
+            "type": "chat",
+            "id": 5,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-3",
+            "created_at": "2026-11-04T08:51:38.924990+00:00"
+          }
+        },
+        {
+          "t": 1793782298966,
+          "data": {
+            "type": "chat",
+            "id": 6,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-4",
+            "created_at": "2026-11-04T08:51:38.944853+00:00"
+          }
+        },
+        {
+          "t": 1793782298986,
+          "data": {
+            "type": "chat",
+            "id": 7,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-5",
+            "created_at": "2026-11-04T08:51:38.965531+00:00"
+          }
+        },
+        {
+          "t": 1793782299006,
+          "data": {
+            "type": "chat",
+            "id": 8,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-6",
+            "created_at": "2026-11-04T08:51:38.985305+00:00"
+          }
+        },
+        {
+          "t": 1793782299026,
+          "data": {
+            "type": "chat",
+            "id": 9,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-7",
+            "created_at": "2026-11-04T08:51:39.005716+00:00"
+          }
+        },
+        {
+          "t": 1793782299047,
+          "data": {
+            "type": "chat",
+            "id": 10,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-8",
+            "created_at": "2026-11-04T08:51:39.025471+00:00"
+          }
+        },
+        {
+          "t": 1793782299068,
+          "data": {
+            "type": "chat",
+            "id": 11,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-9",
+            "created_at": "2026-11-04T08:51:39.045897+00:00"
+          }
+        },
+        {
+          "t": 1793782299093,
+          "data": {
+            "type": "chat",
+            "id": 12,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-10",
+            "created_at": "2026-11-04T08:51:39.066855+00:00"
+          }
+        },
+        {
+          "t": 1793782299107,
+          "data": {
+            "type": "chat",
+            "id": 13,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-11",
+            "created_at": "2026-11-04T08:51:39.091166+00:00"
+          }
+        },
+        {
+          "t": 1793782299128,
+          "data": {
+            "type": "chat",
+            "id": 14,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-12",
+            "created_at": "2026-11-04T08:51:39.106894+00:00"
+          }
+        },
+        {
+          "t": 1793782299149,
+          "data": {
+            "type": "chat",
+            "id": 15,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-13",
+            "created_at": "2026-11-04T08:51:39.127592+00:00"
+          }
+        },
+        {
+          "t": 1793782299169,
+          "data": {
+            "type": "chat",
+            "id": 16,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-14",
+            "created_at": "2026-11-04T08:51:39.148379+00:00"
+          }
+        },
+        {
+          "t": 1793782299193,
+          "data": {
+            "type": "chat",
+            "id": 17,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-15",
+            "created_at": "2026-11-04T08:51:39.169046+00:00"
+          }
+        },
+        {
+          "t": 1793782299212,
+          "data": {
+            "type": "chat",
+            "id": 18,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-16",
+            "created_at": "2026-11-04T08:51:39.192249+00:00"
+          }
+        },
+        {
+          "t": 1793782299233,
+          "data": {
+            "type": "chat",
+            "id": 19,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-17",
+            "created_at": "2026-11-04T08:51:39.211787+00:00"
+          }
+        },
+        {
+          "t": 1793782299254,
+          "data": {
+            "type": "chat",
+            "id": 20,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-18",
+            "created_at": "2026-11-04T08:51:39.232985+00:00"
+          }
+        },
+        {
+          "t": 1793782299274,
+          "data": {
+            "type": "chat",
+            "id": 21,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-19",
+            "created_at": "2026-11-04T08:51:39.253775+00:00"
+          }
+        },
+        {
+          "t": 1793782299295,
+          "data": {
+            "type": "chat",
+            "id": 22,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-20",
+            "created_at": "2026-11-04T08:51:39.274216+00:00"
+          }
+        },
+        {
+          "t": 1793782299316,
+          "data": {
+            "type": "chat",
+            "id": 23,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-21",
+            "created_at": "2026-11-04T08:51:39.295179+00:00"
+          }
+        },
+        {
+          "t": 1793782299337,
+          "data": {
+            "type": "chat",
+            "id": 24,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-22",
+            "created_at": "2026-11-04T08:51:39.316032+00:00"
+          }
+        },
+        {
+          "t": 1793782299359,
+          "data": {
+            "type": "chat",
+            "id": 25,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-23",
+            "created_at": "2026-11-04T08:51:39.336888+00:00"
+          }
+        },
+        {
+          "t": 1793782299379,
+          "data": {
+            "type": "chat",
+            "id": 26,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-24",
+            "created_at": "2026-11-04T08:51:39.358320+00:00"
+          }
+        },
+        {
+          "t": 1793782299400,
+          "data": {
+            "type": "chat",
+            "id": 27,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-25",
+            "created_at": "2026-11-04T08:51:39.378936+00:00"
+          }
+        },
+        {
+          "t": 1793782299427,
+          "data": {
+            "type": "chat",
+            "id": 28,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-1",
+            "created_at": "2026-11-04T08:51:39.399764+00:00"
+          }
+        },
+        {
+          "t": 1793782299449,
+          "data": {
+            "type": "chat",
+            "id": 29,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-2",
+            "created_at": "2026-11-04T08:51:39.426739+00:00"
+          }
+        },
+        {
+          "t": 1793782299470,
+          "data": {
+            "type": "chat",
+            "id": 30,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-3",
+            "created_at": "2026-11-04T08:51:39.448589+00:00"
+          }
+        },
+        {
+          "t": 1793782299491,
+          "data": {
+            "type": "chat",
+            "id": 31,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-4",
+            "created_at": "2026-11-04T08:51:39.470345+00:00"
+          }
+        },
+        {
+          "t": 1793782299513,
+          "data": {
+            "type": "chat",
+            "id": 32,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-5",
+            "created_at": "2026-11-04T08:51:39.491272+00:00"
+          }
+        },
+        {
+          "t": 1793782299533,
+          "data": {
+            "type": "chat",
+            "id": 33,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-6",
+            "created_at": "2026-11-04T08:51:39.512405+00:00"
+          }
+        },
+        {
+          "t": 1793782299554,
+          "data": {
+            "type": "chat",
+            "id": 34,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-7",
+            "created_at": "2026-11-04T08:51:39.533010+00:00"
+          }
+        },
+        {
+          "t": 1793782299576,
+          "data": {
+            "type": "chat",
+            "id": 35,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-8",
+            "created_at": "2026-11-04T08:51:39.553635+00:00"
+          }
+        },
+        {
+          "t": 1793782299595,
+          "data": {
+            "type": "chat",
+            "id": 36,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-9",
+            "created_at": "2026-11-04T08:51:39.575432+00:00"
+          }
+        },
+        {
+          "t": 1793782299616,
+          "data": {
+            "type": "chat",
+            "id": 37,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-10",
+            "created_at": "2026-11-04T08:51:39.595189+00:00"
+          }
+        },
+        {
+          "t": 1793782299637,
+          "data": {
+            "type": "chat",
+            "id": 38,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-11",
+            "created_at": "2026-11-04T08:51:39.615968+00:00"
+          }
+        },
+        {
+          "t": 1793782299659,
+          "data": {
+            "type": "chat",
+            "id": 39,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-12",
+            "created_at": "2026-11-04T08:51:39.636493+00:00"
+          }
+        },
+        {
+          "t": 1793782299679,
+          "data": {
+            "type": "chat",
+            "id": 40,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-13",
+            "created_at": "2026-11-04T08:51:39.658404+00:00"
+          }
+        },
+        {
+          "t": 1793782299699,
+          "data": {
+            "type": "chat",
+            "id": 41,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-14",
+            "created_at": "2026-11-04T08:51:39.679358+00:00"
+          }
+        },
+        {
+          "t": 1793782299722,
+          "data": {
+            "type": "chat",
+            "id": 42,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-15",
+            "created_at": "2026-11-04T08:51:39.699427+00:00"
+          }
+        },
+        {
+          "t": 1793782299743,
+          "data": {
+            "type": "chat",
+            "id": 43,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-16",
+            "created_at": "2026-11-04T08:51:39.721609+00:00"
+          }
+        },
+        {
+          "t": 1793782299764,
+          "data": {
+            "type": "chat",
+            "id": 44,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-17",
+            "created_at": "2026-11-04T08:51:39.742915+00:00"
+          }
+        },
+        {
+          "t": 1793782299785,
+          "data": {
+            "type": "chat",
+            "id": 45,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-18",
+            "created_at": "2026-11-04T08:51:39.763934+00:00"
+          }
+        },
+        {
+          "t": 1793782299805,
+          "data": {
+            "type": "chat",
+            "id": 46,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-19",
+            "created_at": "2026-11-04T08:51:39.784983+00:00"
+          }
+        },
+        {
+          "t": 1793782299826,
+          "data": {
+            "type": "chat",
+            "id": 47,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-20",
+            "created_at": "2026-11-04T08:51:39.804986+00:00"
+          }
+        },
+        {
+          "t": 1793782299846,
+          "data": {
+            "type": "chat",
+            "id": 48,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-21",
+            "created_at": "2026-11-04T08:51:39.825234+00:00"
+          }
+        },
+        {
+          "t": 1793782299867,
+          "data": {
+            "type": "chat",
+            "id": 49,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-22",
+            "created_at": "2026-11-04T08:51:39.846409+00:00"
+          }
+        },
+        {
+          "t": 1793782299888,
+          "data": {
+            "type": "chat",
+            "id": 50,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-23",
+            "created_at": "2026-11-04T08:51:39.867168+00:00"
+          }
+        },
+        {
+          "t": 1793782299909,
+          "data": {
+            "type": "chat",
+            "id": 51,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-24",
+            "created_at": "2026-11-04T08:51:39.888142+00:00"
+          }
+        },
+        {
+          "t": 1793782299930,
+          "data": {
+            "type": "chat",
+            "id": 52,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-25",
+            "created_at": "2026-11-04T08:51:39.909187+00:00"
+          }
+        }
+      ],
+      "text": "🤖 VibeBot\n\n[VibeBot] Stage1 fixed welcome.\n\nsender\n\na-1\n\n🤖 VibeBot\n\n[VibeBot] Stage1 fixed welcome.\n\nsender\n\na-2\n\nsender\n\na-3\n\nsender\n\na-4\n\nsender\n\na-5\n\nsender\n\na-6\n\nsender\n\na-7\n\nsender\n\na-8\n\nsender\n\na-9\n\nsender\n\na-10\n\nsender\n\na-11\n\nsender\n\na-12\n\nsender\n\na-13\n\nsender\n\na-14\n\nsender\n\na-15\n\nsender\n\na-16\n\nsender\n\na-17\n\nsender\n\na-18\n\nsender\n\na-19\n\nsender\n\na-20\n\nsender\n\na-21\n\nsender\n\na-22\n\nsender\n\na-23\n\nsender\n\na-24\n\nsender\n\na-25",
+      "counts_a": {
+        "counts": {
+          "a-1": 1,
+          "a-2": 1,
+          "a-3": 1,
+          "a-4": 1,
+          "a-5": 1,
+          "a-6": 1,
+          "a-7": 1,
+          "a-8": 1,
+          "a-9": 1,
+          "a-10": 1,
+          "a-11": 1,
+          "a-12": 1,
+          "a-13": 1,
+          "a-14": 1,
+          "a-15": 1,
+          "a-16": 1,
+          "a-17": 1,
+          "a-18": 1,
+          "a-19": 1,
+          "a-20": 1,
+          "a-21": 1,
+          "a-22": 1,
+          "a-23": 1,
+          "a-24": 1,
+          "a-25": 1
+        },
+        "unique": 25,
+        "missing": [],
+        "duplicates": 0
+      },
+      "counts_b": {
+        "counts": {
+          "b-1": 0,
+          "b-2": 0,
+          "b-3": 0,
+          "b-4": 0,
+          "b-5": 0,
+          "b-6": 0,
+          "b-7": 0,
+          "b-8": 0,
+          "b-9": 0,
+          "b-10": 0,
+          "b-11": 0,
+          "b-12": 0,
+          "b-13": 0,
+          "b-14": 0,
+          "b-15": 0,
+          "b-16": 0,
+          "b-17": 0,
+          "b-18": 0,
+          "b-19": 0,
+          "b-20": 0,
+          "b-21": 0,
+          "b-22": 0,
+          "b-23": 0,
+          "b-24": 0,
+          "b-25": 0
+        },
+        "unique": 0,
+        "missing": [
+          "b-1",
+          "b-2",
+          "b-3",
+          "b-4",
+          "b-5",
+          "b-6",
+          "b-7",
+          "b-8",
+          "b-9",
+          "b-10",
+          "b-11",
+          "b-12",
+          "b-13",
+          "b-14",
+          "b-15",
+          "b-16",
+          "b-17",
+          "b-18",
+          "b-19",
+          "b-20",
+          "b-21",
+          "b-22",
+          "b-23",
+          "b-24",
+          "b-25"
+        ],
+        "duplicates": 0
+      },
+      "clicks": [
+        {
+          "kind": "unmute",
+          "first_seen": 1793782299027,
+          "attempted_at": 1793782300028,
+          "x": 640.0078125,
+          "y": 699.5,
+          "t": 1793782300030,
+          "ok": true,
+          "input_finished_at": 1793782300036
+        }
+      ]
+    }
+  },
+  "blocked_external_requests": 0,
+  "errors": [],
+  "ok": true,
+  "server_logs": [
+    ".logs/server-loadtest_history_race_08eb0e5_4-4588.log"
+  ],
+  "browser_artifacts": [
+    {
+      "role": "observer",
+      "samples": [
+        {
+          "t": 1793782298879,
+          "none": true,
+          "act": false
+        },
+        {
+          "t": 1793782298976,
+          "none": true,
+          "act": false
+        },
+        {
+          "t": 1793782299077,
+          "none": true,
+          "act": false
+        },
+        {
+          "t": 1793782299176,
+          "ct": 0,
+          "paused": true,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782299277,
+          "ct": 0.053804,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782299378,
+          "ct": 0.152803,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782299477,
+          "ct": 0.254241,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782299576,
+          "ct": 0.352909,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782299678,
+          "ct": 0.453973,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782299776,
+          "ct": 0.553085,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782299877,
+          "ct": 0.653266,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782299977,
+          "ct": 0.754622,
+          "paused": false,
+          "muted": true,
+          "volume": 1,
+          "act": false
+        },
+        {
+          "t": 1793782300081,
+          "ct": 0.892,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300177,
+          "ct": 0.907859,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300278,
+          "ct": 1.009584,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300376,
+          "ct": 1.111202,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300477,
+          "ct": 1.21533,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300577,
+          "ct": 1.307751,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300677,
+          "ct": 1.408928,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300777,
+          "ct": 1.511911,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300877,
+          "ct": 1.615213,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782300977,
+          "ct": 1.716322,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301078,
+          "ct": 1.80945,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301177,
+          "ct": 1.912009,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301278,
+          "ct": 2.013618,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301378,
+          "ct": 2.117179,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301477,
+          "ct": 2.208837,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301577,
+          "ct": 2.309845,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301678,
+          "ct": 2.414039,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301778,
+          "ct": 2.517222,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301878,
+          "ct": 2.597083,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782301978,
+          "ct": 2.710872,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302078,
+          "ct": 2.813951,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302177,
+          "ct": 2.916111,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302278,
+          "ct": 3.017948,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302377,
+          "ct": 3.109774,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302478,
+          "ct": 3.213933,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302578,
+          "ct": 3.315162,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302678,
+          "ct": 3.41813,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302778,
+          "ct": 3.51082,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302878,
+          "ct": 3.611914,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782302978,
+          "ct": 3.714994,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303078,
+          "ct": 3.818096,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303176,
+          "ct": 3.908976,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303277,
+          "ct": 4.01131,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303378,
+          "ct": 4.114958,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303478,
+          "ct": 4.218113,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303578,
+          "ct": 4.308304,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303678,
+          "ct": 4.411686,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303778,
+          "ct": 4.514939,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303878,
+          "ct": 4.616079,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782303978,
+          "ct": 4.708473,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304078,
+          "ct": 4.811597,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304177,
+          "ct": 4.911957,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304277,
+          "ct": 5.015414,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304377,
+          "ct": 5.107774,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304478,
+          "ct": 5.211559,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304578,
+          "ct": 5.312838,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304677,
+          "ct": 5.415206,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304778,
+          "ct": 5.508427,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304878,
+          "ct": 5.609631,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782304977,
+          "ct": 5.712019,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305077,
+          "ct": 5.814764,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305178,
+          "ct": 5.917069,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305277,
+          "ct": 6.009041,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305378,
+          "ct": 6.112597,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305478,
+          "ct": 6.213787,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305577,
+          "ct": 6.316307,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305678,
+          "ct": 6.409473,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305778,
+          "ct": 6.512645,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305877,
+          "ct": 6.61311,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782305978,
+          "ct": 6.71654,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306078,
+          "ct": 6.809291,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306177,
+          "ct": 6.909944,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306277,
+          "ct": 7.012975,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306377,
+          "ct": 7.116037,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306478,
+          "ct": 7.218008,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306578,
+          "ct": 7.310526,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306677,
+          "ct": 7.413003,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306778,
+          "ct": 7.514928,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306878,
+          "ct": 7.618129,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782306977,
+          "ct": 7.709799,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307077,
+          "ct": 7.812862,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307178,
+          "ct": 7.914753,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307277,
+          "ct": 8.017435,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307378,
+          "ct": 8.110401,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307478,
+          "ct": 8.211583,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307578,
+          "ct": 8.314618,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307677,
+          "ct": 8.416872,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307778,
+          "ct": 8.508185,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307878,
+          "ct": 8.611475,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782307978,
+          "ct": 8.714479,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308078,
+          "ct": 8.817532,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308178,
+          "ct": 8.908221,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308277,
+          "ct": 9.010804,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308378,
+          "ct": 9.114541,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308477,
+          "ct": 9.21477,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308578,
+          "ct": 9.308233,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308678,
+          "ct": 9.411261,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308778,
+          "ct": 9.512529,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308877,
+          "ct": 9.614637,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782308978,
+          "ct": 9.708148,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309078,
+          "ct": 9.809366,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309178,
+          "ct": 9.912457,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309277,
+          "ct": 10.014928,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309377,
+          "ct": 10.107581,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309477,
+          "ct": 10.208342,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309578,
+          "ct": 10.31235,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309678,
+          "ct": 10.415517,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309777,
+          "ct": 10.516084,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309878,
+          "ct": 10.60909,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782309978,
+          "ct": 10.712297,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310078,
+          "ct": 10.813525,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310178,
+          "ct": 10.916457,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310277,
+          "ct": 11.008522,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310378,
+          "ct": 11.110379,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310477,
+          "ct": 11.213035,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310577,
+          "ct": 11.315567,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310677,
+          "ct": 11.408143,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310778,
+          "ct": 11.510299,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310878,
+          "ct": 11.613294,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782310977,
+          "ct": 11.716103,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311076,
+          "ct": 11.816276,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311178,
+          "ct": 11.910133,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311278,
+          "ct": 12.013692,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311378,
+          "ct": 12.114511,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311477,
+          "ct": 12.217261,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311577,
+          "ct": 12.308972,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311677,
+          "ct": 12.412263,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311777,
+          "ct": 12.513418,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311878,
+          "ct": 12.617512,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        },
+        {
+          "t": 1793782311978,
+          "ct": 12.709962,
+          "paused": false,
+          "muted": false,
+          "volume": 1,
+          "act": true
+        }
+      ],
+      "user_click_events": [
+        {
+          "kind": "unmute",
+          "t": 1793782300030
+        }
+      ],
+      "ws_log": [
+        {
+          "created_at": 1793782298846,
+          "open_at": 1793782298856,
+          "close_at": null,
+          "code": null
+        }
+      ],
+      "blocked_play_calls": 0,
+      "frames": [
+        {
+          "t": 1793782298858,
+          "data": {
+            "type": "system",
+            "message": "observer has joined the room."
+          }
+        },
+        {
+          "t": 1793782298861,
+          "data": {
+            "type": "chat",
+            "id": 2,
+            "room_id": 1,
+            "user_id": 0,
+            "username": "🤖 VibeBot",
+            "message": "Stage1 fixed welcome.",
+            "created_at": "2026-11-04T08:51:38.853270+00:00"
+          }
+        },
+        {
+          "t": 1793782298905,
+          "data": {
+            "type": "chat",
+            "id": 3,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-1",
+            "created_at": "2026-11-04T08:51:38.771409+00:00"
+          }
+        },
+        {
+          "t": 1793782298926,
+          "data": {
+            "type": "chat",
+            "id": 4,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-2",
+            "created_at": "2026-11-04T08:51:38.904300+00:00"
+          }
+        },
+        {
+          "t": 1793782298945,
+          "data": {
+            "type": "chat",
+            "id": 5,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-3",
+            "created_at": "2026-11-04T08:51:38.924990+00:00"
+          }
+        },
+        {
+          "t": 1793782298966,
+          "data": {
+            "type": "chat",
+            "id": 6,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-4",
+            "created_at": "2026-11-04T08:51:38.944853+00:00"
+          }
+        },
+        {
+          "t": 1793782298986,
+          "data": {
+            "type": "chat",
+            "id": 7,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-5",
+            "created_at": "2026-11-04T08:51:38.965531+00:00"
+          }
+        },
+        {
+          "t": 1793782299006,
+          "data": {
+            "type": "chat",
+            "id": 8,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-6",
+            "created_at": "2026-11-04T08:51:38.985305+00:00"
+          }
+        },
+        {
+          "t": 1793782299026,
+          "data": {
+            "type": "chat",
+            "id": 9,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-7",
+            "created_at": "2026-11-04T08:51:39.005716+00:00"
+          }
+        },
+        {
+          "t": 1793782299047,
+          "data": {
+            "type": "chat",
+            "id": 10,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-8",
+            "created_at": "2026-11-04T08:51:39.025471+00:00"
+          }
+        },
+        {
+          "t": 1793782299068,
+          "data": {
+            "type": "chat",
+            "id": 11,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-9",
+            "created_at": "2026-11-04T08:51:39.045897+00:00"
+          }
+        },
+        {
+          "t": 1793782299093,
+          "data": {
+            "type": "chat",
+            "id": 12,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-10",
+            "created_at": "2026-11-04T08:51:39.066855+00:00"
+          }
+        },
+        {
+          "t": 1793782299107,
+          "data": {
+            "type": "chat",
+            "id": 13,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-11",
+            "created_at": "2026-11-04T08:51:39.091166+00:00"
+          }
+        },
+        {
+          "t": 1793782299128,
+          "data": {
+            "type": "chat",
+            "id": 14,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-12",
+            "created_at": "2026-11-04T08:51:39.106894+00:00"
+          }
+        },
+        {
+          "t": 1793782299149,
+          "data": {
+            "type": "chat",
+            "id": 15,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-13",
+            "created_at": "2026-11-04T08:51:39.127592+00:00"
+          }
+        },
+        {
+          "t": 1793782299169,
+          "data": {
+            "type": "chat",
+            "id": 16,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-14",
+            "created_at": "2026-11-04T08:51:39.148379+00:00"
+          }
+        },
+        {
+          "t": 1793782299193,
+          "data": {
+            "type": "chat",
+            "id": 17,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-15",
+            "created_at": "2026-11-04T08:51:39.169046+00:00"
+          }
+        },
+        {
+          "t": 1793782299212,
+          "data": {
+            "type": "chat",
+            "id": 18,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-16",
+            "created_at": "2026-11-04T08:51:39.192249+00:00"
+          }
+        },
+        {
+          "t": 1793782299233,
+          "data": {
+            "type": "chat",
+            "id": 19,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-17",
+            "created_at": "2026-11-04T08:51:39.211787+00:00"
+          }
+        },
+        {
+          "t": 1793782299254,
+          "data": {
+            "type": "chat",
+            "id": 20,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-18",
+            "created_at": "2026-11-04T08:51:39.232985+00:00"
+          }
+        },
+        {
+          "t": 1793782299274,
+          "data": {
+            "type": "chat",
+            "id": 21,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-19",
+            "created_at": "2026-11-04T08:51:39.253775+00:00"
+          }
+        },
+        {
+          "t": 1793782299295,
+          "data": {
+            "type": "chat",
+            "id": 22,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-20",
+            "created_at": "2026-11-04T08:51:39.274216+00:00"
+          }
+        },
+        {
+          "t": 1793782299316,
+          "data": {
+            "type": "chat",
+            "id": 23,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-21",
+            "created_at": "2026-11-04T08:51:39.295179+00:00"
+          }
+        },
+        {
+          "t": 1793782299337,
+          "data": {
+            "type": "chat",
+            "id": 24,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-22",
+            "created_at": "2026-11-04T08:51:39.316032+00:00"
+          }
+        },
+        {
+          "t": 1793782299359,
+          "data": {
+            "type": "chat",
+            "id": 25,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-23",
+            "created_at": "2026-11-04T08:51:39.336888+00:00"
+          }
+        },
+        {
+          "t": 1793782299379,
+          "data": {
+            "type": "chat",
+            "id": 26,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-24",
+            "created_at": "2026-11-04T08:51:39.358320+00:00"
+          }
+        },
+        {
+          "t": 1793782299400,
+          "data": {
+            "type": "chat",
+            "id": 27,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "a-25",
+            "created_at": "2026-11-04T08:51:39.378936+00:00"
+          }
+        },
+        {
+          "t": 1793782299427,
+          "data": {
+            "type": "chat",
+            "id": 28,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-1",
+            "created_at": "2026-11-04T08:51:39.399764+00:00"
+          }
+        },
+        {
+          "t": 1793782299449,
+          "data": {
+            "type": "chat",
+            "id": 29,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-2",
+            "created_at": "2026-11-04T08:51:39.426739+00:00"
+          }
+        },
+        {
+          "t": 1793782299470,
+          "data": {
+            "type": "chat",
+            "id": 30,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-3",
+            "created_at": "2026-11-04T08:51:39.448589+00:00"
+          }
+        },
+        {
+          "t": 1793782299491,
+          "data": {
+            "type": "chat",
+            "id": 31,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-4",
+            "created_at": "2026-11-04T08:51:39.470345+00:00"
+          }
+        },
+        {
+          "t": 1793782299513,
+          "data": {
+            "type": "chat",
+            "id": 32,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-5",
+            "created_at": "2026-11-04T08:51:39.491272+00:00"
+          }
+        },
+        {
+          "t": 1793782299533,
+          "data": {
+            "type": "chat",
+            "id": 33,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-6",
+            "created_at": "2026-11-04T08:51:39.512405+00:00"
+          }
+        },
+        {
+          "t": 1793782299554,
+          "data": {
+            "type": "chat",
+            "id": 34,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-7",
+            "created_at": "2026-11-04T08:51:39.533010+00:00"
+          }
+        },
+        {
+          "t": 1793782299576,
+          "data": {
+            "type": "chat",
+            "id": 35,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-8",
+            "created_at": "2026-11-04T08:51:39.553635+00:00"
+          }
+        },
+        {
+          "t": 1793782299595,
+          "data": {
+            "type": "chat",
+            "id": 36,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-9",
+            "created_at": "2026-11-04T08:51:39.575432+00:00"
+          }
+        },
+        {
+          "t": 1793782299616,
+          "data": {
+            "type": "chat",
+            "id": 37,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-10",
+            "created_at": "2026-11-04T08:51:39.595189+00:00"
+          }
+        },
+        {
+          "t": 1793782299637,
+          "data": {
+            "type": "chat",
+            "id": 38,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-11",
+            "created_at": "2026-11-04T08:51:39.615968+00:00"
+          }
+        },
+        {
+          "t": 1793782299659,
+          "data": {
+            "type": "chat",
+            "id": 39,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-12",
+            "created_at": "2026-11-04T08:51:39.636493+00:00"
+          }
+        },
+        {
+          "t": 1793782299679,
+          "data": {
+            "type": "chat",
+            "id": 40,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-13",
+            "created_at": "2026-11-04T08:51:39.658404+00:00"
+          }
+        },
+        {
+          "t": 1793782299699,
+          "data": {
+            "type": "chat",
+            "id": 41,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-14",
+            "created_at": "2026-11-04T08:51:39.679358+00:00"
+          }
+        },
+        {
+          "t": 1793782299722,
+          "data": {
+            "type": "chat",
+            "id": 42,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-15",
+            "created_at": "2026-11-04T08:51:39.699427+00:00"
+          }
+        },
+        {
+          "t": 1793782299743,
+          "data": {
+            "type": "chat",
+            "id": 43,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-16",
+            "created_at": "2026-11-04T08:51:39.721609+00:00"
+          }
+        },
+        {
+          "t": 1793782299764,
+          "data": {
+            "type": "chat",
+            "id": 44,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-17",
+            "created_at": "2026-11-04T08:51:39.742915+00:00"
+          }
+        },
+        {
+          "t": 1793782299785,
+          "data": {
+            "type": "chat",
+            "id": 45,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-18",
+            "created_at": "2026-11-04T08:51:39.763934+00:00"
+          }
+        },
+        {
+          "t": 1793782299805,
+          "data": {
+            "type": "chat",
+            "id": 46,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-19",
+            "created_at": "2026-11-04T08:51:39.784983+00:00"
+          }
+        },
+        {
+          "t": 1793782299826,
+          "data": {
+            "type": "chat",
+            "id": 47,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-20",
+            "created_at": "2026-11-04T08:51:39.804986+00:00"
+          }
+        },
+        {
+          "t": 1793782299846,
+          "data": {
+            "type": "chat",
+            "id": 48,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-21",
+            "created_at": "2026-11-04T08:51:39.825234+00:00"
+          }
+        },
+        {
+          "t": 1793782299867,
+          "data": {
+            "type": "chat",
+            "id": 49,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-22",
+            "created_at": "2026-11-04T08:51:39.846409+00:00"
+          }
+        },
+        {
+          "t": 1793782299888,
+          "data": {
+            "type": "chat",
+            "id": 50,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-23",
+            "created_at": "2026-11-04T08:51:39.867168+00:00"
+          }
+        },
+        {
+          "t": 1793782299909,
+          "data": {
+            "type": "chat",
+            "id": 51,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-24",
+            "created_at": "2026-11-04T08:51:39.888142+00:00"
+          }
+        },
+        {
+          "t": 1793782299930,
+          "data": {
+            "type": "chat",
+            "id": 52,
+            "room_id": 1,
+            "user_id": 3,
+            "username": "sender",
+            "message": "b-25",
+            "created_at": "2026-11-04T08:51:39.909187+00:00"
+          }
+        }
+      ],
+      "sent": [],
+      "attempts": [
+        1793782298846
+      ],
+      "console_errors": [],
+      "responses": [
+        {
+          "t": 1793782298773,
+          "url": "http://127.0.0.1:15173/room/O535YF",
+          "status": 200,
+          "finished_at": 1793782298777
+        },
+        {
+          "t": 1793782298778,
+          "url": "http://127.0.0.1:15173/assets/index-D6if0PAm.css",
+          "status": 200,
+          "finished_at": 1793782298778
+        },
+        {
+          "t": 1793782298794,
+          "url": "http://127.0.0.1:15173/assets/index-Cqwav_Gu.js",
+          "status": 200,
+          "finished_at": 1793782298794
+        },
+        {
+          "t": 1793782298871,
+          "url": "http://127.0.0.1:18000/rooms/O535YF",
+          "status": 200,
+          "finished_at": 1793782298871
+        },
+        {
+          "t": 1793782298871,
+          "url": "http://127.0.0.1:18000/rooms/O535YF/queue_list",
+          "status": 200,
+          "finished_at": 1793782298871
+        },
+        {
+          "t": 1793782298881,
+          "url": "http://127.0.0.1:15173/assets/FilePlayer-BwMm96Al.js",
+          "status": 200,
+          "finished_at": 1793782298881
+        },
+        {
+          "t": 1793782298884,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782298908,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782298928,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782298947,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782298969,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782298989,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299009,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299029,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299050,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299078,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299096,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299110,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299130,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299151,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299173,
+          "url": "http://127.0.0.1:15174/tone.webm",
+          "status": 206,
+          "finished_at": null
+        },
+        {
+          "t": 1793782299950,
+          "url": "http://127.0.0.1:18000/rooms/O535YF/chats?limit=50",
+          "status": 200,
+          "finished_at": 1793782299950
+        }
+      ],
+      "clicks": [
+        {
+          "kind": "unmute",
+          "first_seen": 1793782299027,
+          "attempted_at": 1793782300028,
+          "x": 640.0078125,
+          "y": 699.5,
+          "t": 1793782300030,
+          "ok": true,
+          "input_finished_at": 1793782300036
+        }
+      ],
+      "t0": 1793782298769
+    }
+  ],
+  "finished_at": "2026-11-04T08:51:52.199Z"
+}
