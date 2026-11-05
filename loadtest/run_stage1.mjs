@@ -8,6 +8,7 @@ import { startServer } from './lib/server.mjs';
 import { staticServer, tone } from './lib/static-server.mjs';
 import { environment } from './lib/environment.mjs';
 import { resolveCommit } from './lib/commit.mjs';
+import { YOUTUBE_VIDEO } from './lib/youtube.mjs';
 
 const opts = parseArgs(process.argv.slice(2));
 if (opts.commit) opts.commit = resolveCommit(opts.commit).sha;
@@ -51,6 +52,7 @@ try {
       server_forced_kills: 0,
       environment: path.relative(ROOT, envPath), smoke: opts.smoke, metrics: {},
       blocked_external_requests: 0, errors: [], ok: false };
+    if (scenario === 'late_join_youtube') result.metrics.video = YOUTUBE_VIDEO;
     const cleanup = [];
     const database = `loadtest_${scenario}_${sha}_${runNumber}`;
     let server, created = false;
@@ -59,7 +61,9 @@ try {
       await createDatabase(database); created = true;
       server = await startServer(serverSha, database, measurementPoolSize);
       result.server_logs = [path.relative(ROOT, server.logPath)];
-      const data = await seed(database);
+      const data = scenario === 'late_join_youtube'
+        ? await seed(database, { musicUrl: YOUTUBE_VIDEO.url, title: 'Big Buck Bunny', artist: 'Blender', platform: 'Youtube' })
+        : await seed(database);
       const botOnly = scenario === 'reconnect' && condition !== 'browser-10';
       if (!botOnly) {
         const media = await staticServer(await tone(), 15174); cleanup.push(() => media.close());

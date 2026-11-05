@@ -22,7 +22,8 @@ export async function guest(room, nickname) {
   const g = await rest('/rooms/join', { room_code: room.room_code, nickname });
   return { userId: g.user_id, nickname, isHost: false, token: g.token };
 }
-export async function seed(database, { queue = true } = {}) {
+export async function seed(database, { queue = true, musicUrl = 'http://127.0.0.1:15174/tone.webm',
+  title = 'Stage1 tone', artist = 'Local', platform = 'Local' } = {}) {
   const room = await rest('/rooms/', { name: 'Stage1', host_nickname: 'host' });
   const host = { userId: room.host_id, nickname: 'host', isHost: true, token: room.token };
   const g = await guest(room, 'observer');
@@ -35,8 +36,8 @@ export async function seed(database, { queue = true } = {}) {
     // is String without enum (backend/app/models/models.py, schemas/schemas.py).
     await client.query(`INSERT INTO queue_items
       (room_id,user_id,title,artist,thumbnail_url,music_url,platform,is_played)
-      VALUES ($1,$2,'Stage1 tone','Local',NULL,$3,'Local',false)`,
-    [room.id, room.host_id, 'http://127.0.0.1:15174/tone.webm']);
+      VALUES ($1,$2,$4,$5,NULL,$3,$6,false)`,
+    [room.id, room.host_id, musicUrl, title, artist, platform]);
   } finally { await client.end(); }
   return { room, host, guest: g, sender };
 }

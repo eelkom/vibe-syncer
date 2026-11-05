@@ -9,8 +9,8 @@
 - 전용 DB 시간대는 운영과 같은 UTC로 고정한다. `+09:00` 응답은 프론트 `RoomInfosResponseSchema.created_at`의 `z.string().datetime()` 검증을 통과하지 못하므로, 클러스터 시작 옵션과 각 DB의 `ALTER DATABASE ... SET timezone TO 'UTC'`를 함께 적용한다.
 - 포트: API/WS `18000`, 프론트 `15173`, 음원 `15174`. 전부 127.0.0.1에만 바인딩한다. 같은 도구의 동시 실행은 `.logs/stage1.lock`으로 거부한다. 비정상 종료 후 잠금이 남으면 실행 중 프로세스가 없음을 확인한 다음 해당 잠금 파일만 제거한다.
 - 전용 DB가 이미 실행 중이면 접속 정보와 설정을 확인한 뒤 재사용한다. 기존 `loadtest/.pg/`, `.pg.log`를 초기화하거나 삭제하지 않는다. 아래 initdb 명령은 새 전용 클러스터를 만들 때만 사용한다.
-- Python 서버는 dotenv 로딩을 끄고 GEMINI/GOOGLE 키를 지우며 AI 환영 함수는 고정 문자열, DJ 함수는 예외로 치환한다. 치환 후 `app.main`을 import한다. 외부 소켓 연결도 거부한다. 미디어는 로컬 WebM 영상 파일이며 Gemini/YouTube API와 운영 서버를 사용하지 않는다.
-- 브라우저에 `--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1`을 고정 적용한다. 해제 옵션은 없다. 일반 HTTP와 WebSocket은 Playwright Node 프로세스를 거치지 않는다. `blocked_external_requests`는 `page.on('request')`에서 센 127.0.0.1 이외 요청 수와 `page.on('websocket')`에서 센 외부 연결 수의 합이다. 외부 폰트 차단 오류는 발생할 수 있다. `history_race`의 `/chats`만 지연 주입을 위해 `page.route`로 가로챈다.
+- Python 서버는 dotenv 로딩을 끄고 GEMINI/GOOGLE 키를 지우며 AI 환영 함수는 고정 문자열, DJ 함수는 예외로 치환한다. 치환 후 `app.main`을 import한다. 외부 소켓 연결도 거부한다. 기존 시나리오의 미디어는 로컬 WebM 영상 파일이며 Gemini/YouTube API와 운영 서버를 사용하지 않는다. 아래 `late_join_youtube`만 브라우저의 실제 YouTube iframe 경로를 사용하며 서버 격리는 그대로다.
+- 기존 시나리오는 브라우저에 `--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1`을 고정 적용한다. 외부 요청이 허용되는 유일한 시나리오는 명시적으로 선택하는 `late_join_youtube`이며, 이때만 `YOUTUBE_HOSTS`의 YouTube·미디어·광고 호스트를 EXCLUDE에 추가한다. 일반 HTTP와 WebSocket은 Playwright Node 프로세스를 거치지 않는다. `blocked_external_requests`는 `page.on('request')`에서 센 127.0.0.1 이외 요청 수와 `page.on('websocket')`에서 센 외부 연결 수의 합이다. 외부 폰트 차단 오류는 발생할 수 있다. `history_race`의 `/chats`만 지연 주입을 위해 `page.route`로 가로챈다.
 
 ## 환경 변수와 설치
 
@@ -25,7 +25,7 @@ npm ci --prefix loadtest
 (cd loadtest && npx --no-install playwright install chromium)
 ```
 
-Chromium 설치와 실제 브라우저 실행은 브라우저 프로세스 실행이 허용되는 환경에서 한다. 패키지 다운로드 외 네트워크 사용은 필요 없다. 준비 스크립트와 브라우저 모듈도 위 캐시 경로를 고정한다.
+Chromium 설치와 실제 브라우저 실행은 브라우저 프로세스 실행이 허용되는 환경에서 한다. 기존 시나리오는 패키지 다운로드 외 네트워크 사용이 필요 없으며 `late_join_youtube`는 외부 YouTube 연결이 필요하다. 준비 스크립트와 브라우저 모듈도 위 캐시 경로를 고정한다.
 
 새 전용 DB 환경 초기화:
 
@@ -92,7 +92,7 @@ node loadtest/run_stage1.mjs --scenario late_join --runs 5
 node loadtest/summarize.mjs
 ```
 
-`--scenario`는 `late_join`, `message_burst`, `history_race`, `reconnect`, `autoplay`, `all`을 받는다. `--condition`은 정의된 조건 하나만 선택한다(봇만 실행할 때 유용). 조건의 수치나 타이밍을 바꾸는 옵션은 없다. 기본 5회, 재연결 `browser-10`만 기본 3회. `--runs`는 회차 수, `--smoke`는 항상 1회다. 이미 있는 결과는 성공/실패와 무관하게 건너뛴다. 명시적 `--force`는 기존 원본을 `run-N.previous-<timestamp>.json`으로 보존한 뒤 다시 쓴다. 요약은 `run-N.json`만 읽는다. 실패하면 원본을 저장하고 배치를 중단한다. 자동 재실행이나 좋은 결과 선택은 없다.
+`--scenario`는 `late_join`, `message_burst`, `history_race`, `reconnect`, `autoplay`, `late_join_youtube`, `all`을 받는다. `late_join_youtube`는 `all`에 포함되지 않는다. `--condition`은 정의된 조건 하나만 선택한다(봇만 실행할 때 유용). 조건의 수치나 타이밍을 바꾸는 옵션은 없다. 기본 5회, 재연결 `browser-10`만 기본 3회. `--runs`는 회차 수, `--smoke`는 항상 1회다. 이미 있는 결과는 성공/실패와 무관하게 건너뛴다. 명시적 `--force`는 기존 원본을 `run-N.previous-<timestamp>.json`으로 보존한 뒤 다시 쓴다. 요약은 `run-N.json`만 읽는다. 실패하면 원본을 저장하고 배치를 중단한다. 자동 재실행이나 좋은 결과 선택은 없다.
 
 ## 비교 대상과 고정 조건
 
@@ -180,7 +180,7 @@ node loadtest/summarize.mjs
 - 200 조건은 재연결 분포만 보려고 풀 상한을 올린 측정용 서버다. 수정 안 한 서버의 상한은 약 15연결이며 이는 2단계에서 잰다. 14 조건은 풀을 수정하지 않은 서버를 사용한다. 풀 상향 결과를 원래 서버의 수용량으로 해석하지 않는다.
 - 봇은 한 Node 프로세스의 이벤트 루프·네트워크·CPU 스케줄링 한계가 포함된다. 실제 사용자 200명의 브라우저 부하를 재현하지 않는다. 소수 실제 브라우저 검증은 공식 동작 확인용이다.
 - 모든 브라우저에 `--mute-audio`와 `--disable-features=HardwareMediaKeyHandling`을 고정 적용한다. `--mute-audio`는 출력만 끄며 측정에 쓰는 `el.muted`, `el.volume`은 앱이 정한 값 그대로다. 미디어 키 제어 비활성화는 원인이 확정되지 않은 호스트 멈춤을 방지하기 위한 설정이며, 멈춤 원인을 확정하는 근거는 아니다.
-- 로컬 영상 파일과 동일 머신 시계의 결과다. 실제 서비스 경로는 YouTube iframe이지만 시험은 로컬 영상 파일이므로 YouTube의 버퍼링과 `handleUnmute`의 YouTube 분기는 재지 않는다. 원격망/운영 부하, 실제 저전력 모드, 확성기에서 소리가 나는지는 재현하지 않는다. audible은 미디어 요소 상태를 기준으로 한다. 무음 허용 여부는 Chromium 정책에도 좌우된다.
+- 기존 시나리오는 로컬 영상 파일과 동일 머신 시계의 결과다. 실제 서비스 경로는 YouTube iframe이지만 기존 시험은 로컬 영상 파일이므로 YouTube의 버퍼링과 `handleUnmute`의 YouTube 분기는 재지 않는다. 원격망/운영 부하, 실제 저전력 모드, 확성기에서 소리가 나는지는 재현하지 않는다. audible은 미디어 요소 상태를 기준으로 한다. 무음 허용 여부는 Chromium 정책에도 좌우된다.
 - 스모크 수치는 작은 크기의 도구 검증 결과이며 성능 결론에 사용하지 않는다. 로그·캐시·음원·아카이브·전용 DB 데이터는 git에서 제외한다.
 
 ## 2단계: 한 방의 인원 증가 (#36)
@@ -275,7 +275,7 @@ node loadtest/run_stage1.mjs --scenario autoplay --commit <sha>
 node loadtest/run_stage2.mjs --scenario steady --commit <sha> --n 2,10,14,25,100,200
 ```
 
-1단계 --commit은 late_join 또는 autoplay를 명시했을 때만 허용한다. all·message_burst·history_race·reconnect에는 오류를 낸다. 해당 시나리오의 비교 커밋 목록만 한 커밋으로 바꾸며 조건·회차·시간은 동일하다. 결과는 results/stage1/<scenario>/<shortsha>/... 아래에 쓴다.
+1단계 --commit은 late_join, autoplay 또는 late_join_youtube를 명시했을 때만 허용한다. all·message_burst·history_race·reconnect에는 오류를 낸다. 해당 시나리오의 비교 커밋 목록만 한 커밋으로 바꾸며 조건·회차·시간은 동일하다. 결과는 results/stage1/<scenario>/<shortsha>/... 아래에 쓴다.
 
 2단계 --commit은 프론트·서버·아카이브 검증·결과 경로에 함께 적용한다. --n은 기존 시나리오·조건별 N의 선택 필터이며 오름차순으로 실행한다. 예를 들어 --n 10,100은 default에서 10만, pool-250에서 10·100을 선택한다. 선택한 시나리오/스모크 계획에 없는 N은 오류다. chat_accumulation은 --n 3으로 선택할 수 있고, 다른 N만 선택하면 실행하지 않는다. CPU 4배 조건·회차·부하 크기는 그대로다. 결과는 results/stage2/<scenario>/<shortsha>/<condition>/n-<N>/... 에 쓴다. 요약 키에도 커밋이 포함되므로 b86324b 결과와 섞이지 않는다. 기존 결과는 다시 재거나 덮어쓰지 않으며 --force를 명시했을 때만 해당 커밋의 결과를 백업 후 다시 실행한다.
 
@@ -285,3 +285,19 @@ chat_accumulation을 포함하면 선택한 커밋의 profiling 빌드도 준비
 loadtest/scripts/prepare_profiling.sh <sha>
 node loadtest/stage2/validate_backend.mjs --commit <sha>
 ```
+
+
+## 실제 YouTube 늦은 합류 (#40)
+
+`late_join_youtube`는 공개 영상 Big Buck Bunny(Blender)의 ID `aqz-KE-bpKQ`를 사용한다. 기본 5회이며 스모크에서도 `--commit`이 필수다. 호스트 준비 후 30초(스모크 5초)에 게스트가 입장하고 25초(스모크 8초) 관찰한다. 위치 오차는 마지막 10초(스모크는 관찰 전체)다. Gemini는 계속 끄고 운영 서버에는 접속하지 않는다.
+
+```bash
+loadtest/scripts/prepare_commit.sh <sha>
+node loadtest/run_stage1.mjs --scenario late_join_youtube --commit <sha>
+# 스모크: 같은 명령에 --smoke 추가
+node loadtest/summarize_youtube.mjs
+```
+
+결과는 `results/stage1/late_join_youtube/<sha>/youtube/run-N.json`이며 스모크는 `results/smoke/...`다. 기존 결과 건너뛰기·실패 보존 후 배치 중단·재시도 없음은 동일하다. 요약은 본 실행의 원본만 읽어 표준 출력에 표시하고 실패 회차는 표에 남기되 숫자 집계에서 제외한다.
+
+iframe은 100ms마다 콘솔로 표본을 보내며 iframe 평가를 하지 않는다. 광고의 재생 위치도 원본에 그대로 남기고 주 지표 `err_p95_ms`는 기존 계산을 사용한다. `err_p95_excluding_flagged_ms`만 게스트 표본 또는 호스트 보간에 사용한 표본이 광고·버퍼링인 시각을 제외한다. `interference`는 호스트·게스트 각각 `observation`(호스트는 호스트 입장부터)과 `window`(마지막 10초)의 광고·버퍼링·영상 없음·일시정지·전체 표본 수다. `flags`의 `_window` 접미사는 마지막 구간을 뜻한다. 표본 없음·재생 안 됨은 null과 `guest_never_played`로 기록하며 스크립트 오류가 아니다. 외부 요청 수는 `external_hosts`, DNS 차단 수는 `blocked_hosts`, 페이지 오류는 `youtube_page_errors`에 기록한다.
