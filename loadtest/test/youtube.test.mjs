@@ -250,7 +250,7 @@ test('YouTube scenario keeps late_join timing and metrics and never reads iframe
     const run = vm.runInNewContext(`(async function run${code})`, sandbox);
     const metrics = await run({ smoke, cleanup: [], result: {}, seed: { host: {}, guest: {}, room: {} } });
     assert.equal(launches[0][1], false); assert.equal(launches[1][1], true);
-    assert.equal(launches[0][2].allowHosts, YOUTUBE_HOSTS);
+    assert.deepEqual([...launches[0][2].allowHosts], YOUTUBE_HOSTS);
     assert.ok(tabs.every(args => args[6].youtube === true));
     assert.equal(metrics.video, YOUTUBE_VIDEO);
     assert.equal(metrics.activation_before_first_click, true); // Top-frame act, not ytSamples.

@@ -9,3 +9,4 @@ import './stage2-review2.test.mjs';
 import './stage2-review3.test.mjs';
 import './commit-selection.test.mjs';
 import './youtube.test.mjs';
+import './deployed-late-join.test.mjs';
