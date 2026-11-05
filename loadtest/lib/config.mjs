@@ -16,13 +16,15 @@ export function parseArgs(args) {
     else if (key === '--commit') opts.commit = validateCommit(args[++i]);
     else throw new Error(`Unknown argument: ${key}`);
   }
-  if (![...Object.keys(COMPARISONS), 'all', 'reconnect'].includes(opts.scenario)) throw new Error('Unknown scenario');
+  if (![...Object.keys(COMPARISONS), 'all', 'reconnect', 'late_join_youtube'].includes(opts.scenario)) throw new Error('Unknown scenario');
   if (opts.runs !== null && (!Number.isInteger(opts.runs) || opts.runs < 1)) throw new Error('--runs must be a positive integer');
   if (opts.condition !== null && !opts.condition) throw new Error('--condition needs a value');
-  if (opts.commit && !['late_join', 'autoplay'].includes(opts.scenario)) throw new Error('--commit requires --scenario late_join or autoplay');
+  if (opts.scenario === 'late_join_youtube' && !opts.commit) throw new Error('late_join_youtube requires --commit');
+  if (opts.commit && !['late_join', 'autoplay', 'late_join_youtube'].includes(opts.scenario)) throw new Error('--commit requires --scenario late_join, autoplay or late_join_youtube');
   return opts;
 }
 export function plan(opts) {
+  if (opts.scenario === 'late_join_youtube' && !opts.commit) throw new Error('late_join_youtube requires --commit');
   const names = opts.scenario === 'all' ? [...Object.keys(COMPARISONS), 'reconnect'] : [opts.scenario];
   const jobs = [];
   for (const scenario of names) {
@@ -35,7 +37,8 @@ export function plan(opts) {
       for (const sha of ['1b2e6c4', MAIN]) jobs.push({ scenario, sha, serverSha: sha, condition: 'browser-10', defaultRuns: 3 });
     } else {
       const conditions = scenario === 'message_burst' ? (opts.smoke ? ['50'] : ['50', '200', '1000'])
-        : scenario === 'autoplay' ? ['muted-allowed', 'all-blocked', 'silent-blocked'] : ['default'];
+        : scenario === 'autoplay' ? ['muted-allowed', 'all-blocked', 'silent-blocked']
+          : scenario === 'late_join_youtube' ? ['youtube'] : ['default'];
       for (const sha of opts.commit ? [opts.commit] : COMPARISONS[scenario]) for (const condition of conditions) jobs.push({ scenario, sha, serverSha: sha, condition, defaultRuns: 5 });
     }
   }

@@ -16,10 +16,19 @@ export const selectors = {
   input: 'input[placeholder="Message..."]',
   chat: 'div:has(> div > h2:text-is("Chat")) > div.scrollbar-hide.overflow-y-auto',
 };
-export async function launch(cleanup, activation = false) {
+export const YOUTUBE_HOSTS = Object.freeze([
+  'youtube.com', '*.youtube.com', '*.youtube-nocookie.com', '*.googlevideo.com', '*.ytimg.com',
+  '*.ggpht.com', '*.gstatic.com', '*.google.com', '*.googleapis.com', '*.doubleclick.net',
+  '*.googlesyndication.com', '*.googleadservices.com',
+]);
+export function hostResolverRules(allowHosts = []) {
+  return '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1'
+    + allowHosts.map(host => `, EXCLUDE ${host}`).join('');
+}
+export async function launch(cleanup, activation = false, { allowHosts } = {}) {
   const browser = await chromium.launch({ headless: true, args: [
     `--autoplay-policy=${activation ? 'document-user-activation-required' : 'no-user-gesture-required'}`,
-    '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
+    hostResolverRules(allowHosts),
     '--mute-audio',
     '--disable-features=HardwareMediaKeyHandling',
   ] });
@@ -27,11 +36,31 @@ export async function launch(cleanup, activation = false) {
   cleanup.push(() => browser.close());
   return browser;
 }
-export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed', captureArtifacts = true) {
+export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed', captureArtifacts = true, { youtube = false } = {}) {
   if (!['muted-allowed', 'all-blocked', 'silent-blocked'].includes(playbackCondition)) throw new Error(`Unknown playback condition: ${playbackCondition}`);
   const context = await browser.newContext({ serviceWorkers: 'block' });
   cleanup.push(() => context.close());
-  await context.addInitScript(({ user, playbackCondition }) => {
+  await context.addInitScript(({ user, playbackCondition, youtube }) => {
+    if (youtube && window.top !== window) {
+      // Never write app credentials or instrument app controls in an iframe.
+      const hostname = window.location.hostname;
+      if ((hostname === 'youtube.com' || hostname.endsWith('.youtube.com')
+        || hostname === 'youtube-nocookie.com' || hostname.endsWith('.youtube-nocookie.com'))
+        && window.location.pathname.startsWith('/embed/')) {
+        setInterval(() => {
+          const el = document.querySelector('video');
+          const player = document.querySelector('.html5-video-player');
+          const sample = el ? { t: Date.now(), ct: el.currentTime, paused: el.paused,
+            muted: el.muted, volume: el.volume, readyState: el.readyState,
+            ad: !!document.querySelector('.html5-video-player.ad-showing'),
+            buffering: !!document.querySelector('.html5-video-player.buffering-mode') || el.readyState < 3,
+            player_state: [...(player?.classList ?? [])].find(name => /^(playing|paused|buffering|unstarted|ended)-mode$/.test(name)) ?? null }
+            : { t: Date.now(), none: true };
+          console.debug('__yt_sample ' + JSON.stringify(sample));
+        }, 100);
+      }
+      return;
+    }
     // All nine commits: contexts/UserContext.tsx:16-18 and types/user.ts:1-6
     // read this exact shape. Route is /room/:id in routes/routePath.ts:3.
     sessionStorage.setItem('user', JSON.stringify(user));
@@ -121,14 +150,43 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
         },
       });
     }
-  }, { user, playbackCondition });
+  }, { user, playbackCondition, youtube });
   const page = await context.newPage();
   const state = { page, frames: [], sent: [], attempts: [], consoleErrors: [], responses: [], clicks: [], reconciledClicks: 0 };
+  if (youtube) {
+    state.ytSamples = [];
+    result.external_hosts ??= {};
+    result.blocked_hosts ??= {};
+    result.youtube_page_errors ??= [];
+    state.blockedHosts = result.blocked_hosts;
+  }
+  const externalRequest = url => {
+    const host = new URL(url).hostname;
+    if (host === '127.0.0.1') return;
+    if (youtube) result.external_hosts[host] = (result.external_hosts[host] ?? 0) + 1;
+    else result.blocked_external_requests++;
+  };
   page.on('request', request => {
-    if (new URL(request.url()).hostname !== '127.0.0.1') result.blocked_external_requests++;
+    externalRequest(request.url());
   });
-  page.on('console', msg => { if (msg.type() === 'error') state.consoleErrors.push({ t: Date.now(), text: msg.text() }); });
-  page.on('pageerror', err => result.errors.push(`pageerror: ${err.message}`));
+  if (youtube) page.on('requestfailed', request => {
+    if (request.failure()?.errorText === 'net::ERR_NAME_NOT_RESOLVED') {
+      const host = new URL(request.url()).hostname;
+      result.blocked_hosts[host] = (result.blocked_hosts[host] ?? 0) + 1;
+    }
+  });
+  page.on('console', msg => {
+    if (youtube && msg.text().startsWith('__yt_sample ')) {
+      try { state.ytSamples.push(JSON.parse(msg.text().slice('__yt_sample '.length))); }
+      catch (error) { result.errors.push(`YouTube sample: ${error.message}`); }
+      return;
+    }
+    if (msg.type() === 'error') state.consoleErrors.push({ t: Date.now(), text: msg.text() });
+  });
+  page.on('pageerror', err => {
+    if (youtube) result.youtube_page_errors.push({ t: Date.now(), text: err.message });
+    else result.errors.push(`pageerror: ${err.message}`);
+  });
   page.on('response', response => {
     const record = { t: Date.now(), url: response.url(), status: response.status(), finished_at: null };
     state.responses.push(record);
@@ -137,7 +195,7 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     }).catch(() => {});
   });
   page.on('websocket', ws => {
-    if (new URL(ws.url()).hostname !== '127.0.0.1') result.blocked_external_requests++;
+    externalRequest(ws.url());
     state.attempts.push(Date.now());
     for (const [event, list] of [['framereceived', state.frames], ['framesent', state.sent]]) {
       ws.on(event, frame => {
@@ -150,7 +208,7 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     result.browser_artifacts ??= [];
     let observation = {};
     try { observation = await readObservation(state, result); } catch (error) { result.errors.push(`sample capture: ${error.message}`); }
-    result.browser_artifacts.push({ role: user.nickname, ...observation, frames: state.frames,
+    result.browser_artifacts.push({ role: user.nickname, ...observation, ...(youtube ? { yt_samples: state.ytSamples } : {}), frames: state.frames,
       sent: state.sent, attempts: (observation.ws_log ?? []).map(entry => entry.created_at), console_errors: state.consoleErrors,
       responses: state.responses, clicks: state.clicks, t0: state.t0 ?? null });
   });
@@ -230,6 +288,25 @@ export async function readyHost(state, room, alreadyEntered = false) {
   await until(async () => state.page.evaluate(() => {
     const el = document.querySelector('audio,video'); return el && !el.paused && el.currentTime >= 0.2;
   }), 20000, 'host audio playback');
+  await until(() => state.attempts.length && state.frames.length, 15000, 'host WebSocket receive');
+  const since = Date.now();
+  await state.page.locator(selectors.play).click();
+  await until(() => state.sent.some(f => f.t >= since && f.data.type === 'sync' && f.data.action === 'pause'), 5000, 'host pause sync frame');
+  await sleep(300);
+  await state.page.locator(selectors.play).click();
+  state.lastPlayClickAt = await state.page.evaluate(() => window.__lastPlaybackClickAt);
+  await until(() => state.sent.some(f => f.t >= since && f.data.type === 'sync' && f.data.action === 'play'), 5000, 'host play sync frame');
+}
+export async function readyHostYouTube(state, room) {
+  await enter(state, room);
+  try {
+    await until(() => {
+      const s = state.ytSamples.at(-1);
+      return s && !s.none && !s.paused && s.ct >= 0.2 && !s.ad;
+    }, 60000, 'host YouTube playback');
+  } catch (error) {
+    throw new Error(`${error.message}; last YouTube samples: ${JSON.stringify(state.ytSamples.slice(-10))}; blocked_hosts: ${JSON.stringify(state.blockedHosts)}`);
+  }
   await until(() => state.attempts.length && state.frames.length, 15000, 'host WebSocket receive');
   const since = Date.now();
   await state.page.locator(selectors.play).click();
