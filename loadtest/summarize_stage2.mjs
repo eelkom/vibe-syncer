@@ -19,7 +19,7 @@ const fields = ['inp_ms', 'delivery_ms.p50', 'delivery_ms.p75', 'delivery_ms.p95
 export function summarizeStage2(runs) {
   const groups = new Map();
   for (const run of runs) {
-    const key = `${run.scenario}/${run.condition}/n-${run.n}`;
+    const key = `${run.scenario}/${run.commit ?? 'b86324b'}/${run.condition}/n-${run.n}`;
     if (!groups.has(key)) groups.set(key, []); groups.get(key).push(run);
   }
   return [...groups].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })).map(([key, rounds]) => {
@@ -45,9 +45,9 @@ export function renderStage2(groups) {
     'default는 풀을 수정하지 않은 서버의 약 15연결 한계를 측정한다. pool-250은 풀 상한 250으로 다음 병목을 찾는 진단용이며 원래 서버의 수용량과 구분한다.', '',
     'INP 200ms·전달 지연 p95 1000ms는 이 시험 조건의 외부 기준 지표로 초과 여부를 별도 표시한다. err_p95 500ms는 공인 기준이 없는 자체 목표다. 이 초과 표시는 서비스 실패 코드와 별도로 제시한다.', '',
     '봇 이벤트 루프 지연 p95 > 100ms는 「측정기 부하」로 표시한다. 이 경우 지연 지표를 믿기 어렵다. 집계에서 제외하지 않는다. 숫자는 회차 중앙값·최댓값이며 결측은 0으로 만들지 않는다. Long Task와 버려진 프레임은 기록 지표다.', '',
-    '| 시나리오/조건/N | 회차 | 머신 정지 무효 회차 | 판정 | 사유 코드 | INP>200 | 전달p95>1000 | 오차p95>500 | 측정기 부하 |', '|---|---:|---:|---|---|---|---|---|---|',
+    '| 시나리오/커밋/조건/N | 회차 | 머신 정지 무효 회차 | 판정 | 사유 코드 | INP>200 | 전달p95>1000 | 오차p95>500 | 측정기 부하 |', '|---|---:|---:|---|---|---|---|---|---|',
     ...groups.map(g => `| ${g.key} | ${g.rounds} | ${g.invalid_machine_stall} | ${g.status} | ${g.reasons.join(', ') || '-'} | ${fmt(g.thresholds.inp_over_200)} | ${fmt(g.thresholds.delivery_p95_over_1000)} | ${fmt(g.thresholds.err_p95_over_500)} | ${g.measurement_load ? '측정기 부하' : '-'} |`), '',
-    '| 시나리오/조건/N | 지표 | 회차 중앙값 | 회차 최댓값 | 결측 회차 |', '|---|---|---:|---:|---:|'];
+    '| 시나리오/커밋/조건/N | 지표 | 회차 중앙값 | 회차 최댓값 | 결측 회차 |', '|---|---|---:|---:|---:|'];
   for (const g of groups) for (const [field, m] of Object.entries(g.metrics)) lines.push(`| ${g.key} | ${field} | ${fmt(m.median)} | ${fmt(m.max)} | ${m.missing} |`);
   return lines.join('\n') + '\n';
 }

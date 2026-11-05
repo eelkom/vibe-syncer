@@ -1,7 +1,7 @@
 import path from 'node:path';
-import { mkdir, readFile, stat, writeFile, copyFile, unlink } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
-import { ROOT, REPO, deadline } from './lib/common.mjs';
+import { mkdir, readFile, writeFile, copyFile, unlink } from 'node:fs/promises';
+import { ROOT, deadline } from './lib/common.mjs';
+import { resolveCommit, validateArchive } from './lib/commit.mjs';
 import { createDatabase, dropDatabase } from './lib/database.mjs';
 import { startServer } from './lib/server.mjs';
 import { environment } from './lib/environment.mjs';
@@ -18,7 +18,10 @@ import { verdict, sampleGapMetrics, shouldStopBatch } from './stage2/stats.mjs';
 import { capturePower, warnBattery } from './stage2/power.mjs';
 import { readSleepLog, sleepStatus } from './stage2/sleep.mjs';
 import { closeOwnedBrowser } from './stage2/browser-process.mjs';
-const opts = options(process.argv.slice(2)), jobs = plan(opts);
+const opts = options(process.argv.slice(2));
+const sha = opts.commit ? resolveCommit(opts.commit).sha : SHA;
+opts.commit = sha;
+const jobs = plan(opts);
 const root = path.join(ROOT, opts.smoke ? 'results/smoke/stage2' : 'results/stage2');
 await mkdir(root, { recursive: true }); await mkdir(path.join(ROOT, '.logs'), { recursive: true });
 const lock = path.join(ROOT, '.logs/stage2.lock');
@@ -27,13 +30,12 @@ const previous = [], stamp = new Date().toISOString().replaceAll(':', '-');
 let env, envPath;
 try {
   const power = {}; warnBattery(capturePower(power, 'start'));
-  const full = execFileSync('git', ['rev-parse', SHA], { cwd: REPO, encoding: 'utf8' }).trim();
-  if ((await readFile(path.join(ROOT, '.baselines', SHA, '.archive-sha'), 'utf8')).trim() !== full) throw new Error('Prepare archived b86324b first');
-  for (const profiling of new Set(jobs.map(j => j.profiling))) await stat(path.join(ROOT, '.baselines', SHA, 'frontend', profiling ? 'dist-profiling/index.html' : 'dist/index.html'));
+  let full;
+  for (const profiling of new Set(jobs.map(j => j.profiling))) ({ full } = await validateArchive(sha, { profiling }));
   env = await environment(process.argv.slice(2)); env.stage = 2; env.commit = full; Object.assign(env, power);
   envPath = path.join(root, `env-${stamp}.json`); await writeFile(envPath, JSON.stringify(env, null, 2) + '\n');
   for (const job of jobs) {
-    const target = path.join(root, job.scenario, SHA, job.condition, `n-${job.n}`, `run-${job.run}.json`);
+    const target = path.join(root, job.scenario, sha, job.condition, `n-${job.n}`, `run-${job.run}.json`);
     let existingText;
     try { existingText = await readFile(target, 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     // --force preserves even incomplete JSON as before; only selection by
@@ -45,7 +47,7 @@ try {
     }
     await mkdir(path.dirname(target), { recursive: true });
     if (existingText !== undefined) await copyFile(target, target.replace('.json', `.previous-${stamp}.json`));
-    const result = { stage: 2, scenario: job.scenario, commit: SHA, commit_full: full, condition: job.condition, n: job.n, run: job.run,
+    const result = { stage: 2, scenario: job.scenario, commit: sha, commit_full: full, condition: job.condition, n: job.n, run: job.run,
       smoke: opts.smoke, profiling: job.profiling, cpu_throttle: job.cpu, measurement_pool_size: job.pool,
       environment: path.relative(ROOT, envPath), started_at: new Date().toISOString(), phase: 'init', ok: false, skipped: false,
       setup_failed: false, connected_at_setup: 0, blocked_external_requests: 0, server_forced_kills: 0, browser_forced_kills: 0, errors: [], metrics: {} };
@@ -61,11 +63,11 @@ try {
     console.log(`RUN ${job.scenario} ${job.condition} N=${job.n} #${job.run}`);
     try {
       result.phase = 'database'; await createDatabase(database); created = true;
-      result.phase = 'server'; server = await startServer(SHA, database, job.pool, instrument); monitor = monitorServer(server, instrument);
+      result.phase = 'server'; server = await startServer(sha, database, job.pool, instrument); monitor = monitorServer(server, instrument);
       result.server_log = path.relative(ROOT, server.logPath); result.instrument_log = path.relative(ROOT, instrument);
       const seed = await seedStage2(database);
       const media = await staticServer(await tone(), 15174); cleanup.push(() => media.close());
-      const front = await staticServer(path.join(ROOT, '.baselines', SHA, 'frontend', job.profiling ? 'dist-profiling' : 'dist'), 15173, true); cleanup.push(() => front.close());
+      const front = await staticServer(path.join(ROOT, '.baselines', sha, 'frontend', job.profiling ? 'dist-profiling' : 'dist'), 15173, true); cleanup.push(() => front.close());
       ctx = { job, smoke: opts.smoke, cleanup, result, seed, inputs: [], actions: [], checkpointInputs: [] };
       result.phase = 'browsers';
       const hb = await launchStage2(browsers), gb = await launchStage2(browsers, true);

@@ -258,3 +258,26 @@ node loadtest/stage2/validate_backend.mjs
 ```
 
 한계: 봇과 측정 대상이 같은 머신의 CPU·네트워크·DB를 공유한다. 봇은 렌더하지 않으며 실제 프론트 관찰자는 1명이다. 키보드·마우스 입력은 스크립트이므로 실제 사용자 행동 분포가 아니다. 4배 CPU 스로틀은 지정한 관찰자 페이지에만 적용된다. macOS의 ps `%cpu`는 평균이 섞인 값이므로 순간 CPU 사용률로 해석하지 않는다. 로컬 영상 파일·동일 머신 시계·차단된 외부 요청 조건이며 원격 YouTube·실제 스피커 출력·운영 트래픽을 재현하지 않는다. 마커·샘플·성능 관측 배열의 계측 비용도 CPU·힙에 포함된다. 프로파일링 빌드의 추가 비용이 있으므로 accumulation 시간은 일반 빌드 시간과 직접 비교하지 않는다.
+
+
+## 특정 수정 커밋만 측정
+
+두 러너 모두 `--commit <sha>`는 저장소에 존재하는 7~40자리 소문자 hex 해시를 받는다. 실행 시 prepare_commit.sh와 같은 canonical short SHA로 정규화하고, 결과에는 full SHA도 기록한다. 작업 트리 대신 그 커밋의 git archive·빌드 산출물을 사용한다. 옵션이 없으면 기존 비교·b86324b 실행 계획을 유지한다.
+
+```bash
+loadtest/scripts/prepare_commit.sh <sha>
+node loadtest/run_stage1.mjs --scenario late_join --commit <sha>
+node loadtest/run_stage1.mjs --scenario autoplay --commit <sha>
+node loadtest/run_stage2.mjs --scenario steady --commit <sha> --n 2,10,14,25,100,200
+```
+
+1단계 --commit은 late_join 또는 autoplay를 명시했을 때만 허용한다. all·message_burst·history_race·reconnect에는 오류를 낸다. 해당 시나리오의 비교 커밋 목록만 한 커밋으로 바꾸며 조건·회차·시간은 동일하다. 결과는 results/stage1/<scenario>/<shortsha>/... 아래에 쓴다.
+
+2단계 --commit은 프론트·서버·아카이브 검증·결과 경로에 함께 적용한다. --n은 기존 시나리오·조건별 N의 선택 필터이며 오름차순으로 실행한다. 예를 들어 --n 10,100은 default에서 10만, pool-250에서 10·100을 선택한다. 선택한 시나리오/스모크 계획에 없는 N은 오류다. chat_accumulation은 --n 3으로 선택할 수 있고, 다른 N만 선택하면 실행하지 않는다. CPU 4배 조건·회차·부하 크기는 그대로다. 결과는 results/stage2/<scenario>/<shortsha>/<condition>/n-<N>/... 에 쓴다. 요약 키에도 커밋이 포함되므로 b86324b 결과와 섞이지 않는다. 기존 결과는 다시 재거나 덮어쓰지 않으며 --force를 명시했을 때만 해당 커밋의 결과를 백업 후 다시 실행한다.
+
+chat_accumulation을 포함하면 선택한 커밋의 profiling 빌드도 준비한다. 인자가 없는 prepare_profiling.sh는 기존대로 b86324b를 준비한다. 브라우저 없는 서버·봇 검증도 같은 커밋의 .archive-sha를 확인한 뒤 서버를 시작한다.
+
+```bash
+loadtest/scripts/prepare_profiling.sh <sha>
+node loadtest/stage2/validate_backend.mjs --commit <sha>
+```
