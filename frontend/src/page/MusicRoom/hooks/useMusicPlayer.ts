@@ -405,6 +405,14 @@ const useMusicPlayer = ({
       playerRef.current?.seekTo(timestamp, 'seconds');
       pendingSyncRef.current = null;
     }
+
+    if (!user?.isHost && hasUnmuted) {
+      // Retry unmuting if the user clicked before the player was ready.
+      const internalPlayer = playerRef.current?.getInternalPlayer();
+      if (isYouTubeInternalPlayer(internalPlayer)) {
+        internalPlayer.unMute();
+      }
+    }
   };
 
   const handleEnded = async () => {
