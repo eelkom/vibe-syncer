@@ -7,8 +7,10 @@ import { createDatabase, dropDatabase, seed } from './lib/database.mjs';
 import { startServer } from './lib/server.mjs';
 import { staticServer, tone } from './lib/static-server.mjs';
 import { environment } from './lib/environment.mjs';
+import { resolveCommit } from './lib/commit.mjs';
 
 const opts = parseArgs(process.argv.slice(2));
+if (opts.commit) opts.commit = resolveCommit(opts.commit).sha;
 const jobs = plan(opts);
 const resultRoot = path.join(ROOT, 'results', opts.smoke ? 'smoke' : 'stage1');
 const stamp = new Date().toISOString().replaceAll(':', '-');

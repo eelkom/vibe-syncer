@@ -12,6 +12,9 @@ reconnect의 peak_*_per_s는 기존 고정 1초 구간 최고치다. peak_*_roll
 
 | 시나리오/커밋/조건 | 회차 | 스크립트 실패 | 소리 재생 실패 | 주입 무효 회차 | 호스트 멈춤 무효 회차 | 활성화 오염 무효 회차 |
 |---|---:|---:|---:|---:|---:|---:|
+| autoplay/66fec9a/all-blocked | 5 | 0 | 0 | 0 | 0 | 0 |
+| autoplay/66fec9a/muted-allowed | 5 | 0 | 0 | 0 | 0 | 0 |
+| autoplay/66fec9a/silent-blocked | 5 | 0 | 0 | 0 | 0 | 0 |
 | autoplay/a086001/all-blocked | 5 | 0 | 5 | 0 | 0 | 0 |
 | autoplay/a086001/muted-allowed | 5 | 0 | 0 | 0 | 0 | 0 |
 | autoplay/a086001/silent-blocked | 5 | 0 | 5 | 0 | 0 | 0 |
@@ -24,6 +27,7 @@ reconnect의 peak_*_per_s는 기존 고정 1초 구간 최고치다. peak_*_roll
 | history_race/08eb0e5/default | 5 | 0 | 0 | 0 | 0 | 0 |
 | history_race/32cdc26/default | 5 | 0 | 0 | 0 | 0 | 0 |
 | history_race/b86324b/default | 5 | 0 | 0 | 0 | 0 | 0 |
+| late_join/66fec9a/default | 5 | 0 | 0 | 0 | 0 | 0 |
 | late_join/8003014/default | 5 | 0 | 0 | 0 | 0 | 0 |
 | late_join/b86324b/default | 5 | 0 | 0 | 0 | 0 | 0 |
 | late_join/e75a31c/default | 5 | 0 | 0 | 0 | 0 | 0 |
@@ -43,6 +47,27 @@ reconnect의 peak_*_per_s는 기존 고정 1초 구간 최고치다. peak_*_roll
 
 | 시나리오/커밋/조건 | 지표 | 회차 중앙값 | 회차 p75 | 회차 p95 | 유효 회차 | 결측 회차 |
 |---|---|---:|---:|---:|---:|---:|
+| autoplay/66fec9a/all-blocked | first_playback_ms | 2110 | 2640 | 2644 | 5 | 0 |
+| autoplay/66fec9a/all-blocked | audible_ms | 2110 | 2640 | 2644 | 5 | 0 |
+| autoplay/66fec9a/all-blocked | clicks_count | 1 | 1 | 1 | 5 | 0 |
+| autoplay/66fec9a/all-blocked | err_after_audible_ms | 261.865 | 269.605 | 273.374 | 5 | 0 |
+| autoplay/66fec9a/all-blocked | blocked_play_calls | 2 | 2 | 2 | 5 | 0 |
+| autoplay/66fec9a/all-blocked | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/66fec9a/all-blocked | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/66fec9a/muted-allowed | first_playback_ms | 809 | 810 | 1032 | 5 | 0 |
+| autoplay/66fec9a/muted-allowed | audible_ms | 1809 | 1910 | 2031 | 5 | 0 |
+| autoplay/66fec9a/muted-allowed | clicks_count | 1 | 1 | 1 | 5 | 0 |
+| autoplay/66fec9a/muted-allowed | err_after_audible_ms | 273.094 | 278.965 | 349.767 | 5 | 0 |
+| autoplay/66fec9a/muted-allowed | blocked_play_calls | null | null | null | 0 | 5 |
+| autoplay/66fec9a/muted-allowed | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/66fec9a/muted-allowed | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/66fec9a/silent-blocked | first_playback_ms | 4016 | 4546 | 4640 | 5 | 0 |
+| autoplay/66fec9a/silent-blocked | audible_ms | 4016 | 4546 | 4640 | 5 | 0 |
+| autoplay/66fec9a/silent-blocked | clicks_count | 2 | 2 | 2 | 5 | 0 |
+| autoplay/66fec9a/silent-blocked | err_after_audible_ms | 239.406 | 243.593 | 245.128 | 5 | 0 |
+| autoplay/66fec9a/silent-blocked | blocked_play_calls | 3 | 3 | 3 | 5 | 0 |
+| autoplay/66fec9a/silent-blocked | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| autoplay/66fec9a/silent-blocked | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | autoplay/a086001/all-blocked | first_playback_ms | null | null | null | 0 | 5 |
 | autoplay/a086001/all-blocked | audible_ms | null | null | null | 0 | 5 |
 | autoplay/a086001/all-blocked | clicks_count | 1 | 1 | 1 | 5 | 0 |
@@ -130,6 +155,21 @@ reconnect의 peak_*_per_s는 기존 고정 1초 구간 최고치다. peak_*_roll
 | history_race/b86324b/default | dup_total | 0 | 0 | 0 | 5 | 0 |
 | history_race/b86324b/default | on_screen_total | 50 | 50 | 50 | 5 | 0 |
 | history_race/b86324b/default | extra_history_gets | 0 | 0 | 0 | 5 | 0 |
+| late_join/66fec9a/default | sync_time_ms | 631 | 730 | 731 | 5 | 0 |
+| late_join/66fec9a/default | sync_time_2s_ms | 631 | 730 | 731 | 5 | 0 |
+| late_join/66fec9a/default | err_at_5s_ms | 317.784 | 320.599 | 338.374 | 5 | 0 |
+| late_join/66fec9a/default | err_at_10s_ms | 317.934 | 320.291 | 338.176 | 5 | 0 |
+| late_join/66fec9a/default | err_at_20s_ms | 317.064 | 320.594 | 338.781 | 5 | 0 |
+| late_join/66fec9a/default | err_p50_ms | 317.433 | 320.298 | 338.369 | 5 | 0 |
+| late_join/66fec9a/default | err_p75_ms | 317.658 | 320.468 | 338.62 | 5 | 0 |
+| late_join/66fec9a/default | err_p95_ms | 317.972 | 320.729 | 339.205 | 5 | 0 |
+| late_join/66fec9a/default | clicks_count | 1 | 1 | 1 | 5 | 0 |
+| late_join/66fec9a/default | first_sync_frame_ms | 237 | 246 | 274 | 5 | 0 |
+| late_join/66fec9a/default | queue_response_ms | 270 | 280 | 309 | 5 | 0 |
+| late_join/66fec9a/default | ws_reconnects | 0 | 0 | 0 | 5 | 0 |
+| late_join/66fec9a/default | guest_console_errors | 0 | 0 | 0 | 5 | 0 |
+| late_join/66fec9a/default | host_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
+| late_join/66fec9a/default | guest_unexpected_pauses | 0 | 0 | 0 | 5 | 0 |
 | late_join/8003014/default | sync_time_ms | null | null | null | 0 | 5 |
 | late_join/8003014/default | sync_time_2s_ms | null | null | null | 0 | 5 |
 | late_join/8003014/default | err_at_5s_ms | 32221.139 | 32974.062 | 33930.642 | 5 | 0 |

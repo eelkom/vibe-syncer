@@ -27,7 +27,7 @@ export async function launch(cleanup, activation = false) {
   cleanup.push(() => browser.close());
   return browser;
 }
-export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed') {
+export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed', captureArtifacts = true) {
   if (!['muted-allowed', 'all-blocked', 'silent-blocked'].includes(playbackCondition)) throw new Error(`Unknown playback condition: ${playbackCondition}`);
   const context = await browser.newContext({ serviceWorkers: 'block' });
   cleanup.push(() => context.close());
@@ -146,7 +146,7 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     }
   });
   // Capture even a failed scenario's partial samples/frames before context close.
-  cleanup.push(async () => {
+  if (captureArtifacts) cleanup.push(async () => {
     result.browser_artifacts ??= [];
     let observation = {};
     try { observation = await readObservation(state, result); } catch (error) { result.errors.push(`sample capture: ${error.message}`); }
@@ -225,8 +225,8 @@ export function scriptedUser(state, cleanup, result) {
   cleanup.push(stop);
   return stop;
 }
-export async function readyHost(state, room) {
-  await enter(state, room);
+export async function readyHost(state, room, alreadyEntered = false) {
+  if (!alreadyEntered) await enter(state, room);
   await until(async () => state.page.evaluate(() => {
     const el = document.querySelector('audio,video'); return el && !el.paused && el.currentTime >= 0.2;
   }), 20000, 'host audio playback');

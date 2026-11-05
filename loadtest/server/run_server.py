@@ -30,9 +30,12 @@ def main():
     parser.add_argument("port", type=int)
     parser.add_argument("--database-url", required=True)
     parser.add_argument("--measurement-pool-size", type=int)
+    parser.add_argument("--instrument", type=Path)
     args = parser.parse_args()
     if args.measurement_pool_size is not None and not 1 <= args.measurement_pool_size <= 300:
         parser.error("--measurement-pool-size must be in [1, 300]")
+    if args.instrument and not args.instrument.resolve().is_relative_to(Path(__file__).resolve().parents[1]):
+        parser.error("--instrument must be inside loadtest")
     url = urlparse(args.database_url)
     if url.hostname != "127.0.0.1" or url.port != 55432:
         parser.error("DATABASE_URL must target 127.0.0.1:55432")
@@ -80,6 +83,11 @@ def main():
         else:
             logging.info("STAGE1 AI replacement absent: %s", name)
     app = importlib.import_module("app.main").app
+    if args.instrument:
+        from instrument import install
+        from app.database import engine
+        from app.core.websocket_manager import ConnectionManager
+        install(app, engine, ConnectionManager, args.instrument.resolve())
     import uvicorn
     class MeasuredServer(uvicorn.Server):
         async def startup(self, sockets=None):
