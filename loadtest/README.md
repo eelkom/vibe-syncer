@@ -262,6 +262,10 @@ node loadtest/stage2/validate_backend.mjs
 
 ## 특정 수정 커밋만 측정
 
+이슈 #33 재현 E2E는 전용 Postgres(위 공통 준비 절차)가 필요하다.
+먼저 `loadtest/scripts/prepare_commit.sh <sha>`로 대상 빌드를 준비한다.
+`node loadtest/e2e/queue_update_race.mjs --commit <sha> --runs 3`으로 실행한다(종료 코드: 통과 0, 판정 실패 1, 준비 오류 2).
+
 두 러너 모두 `--commit <sha>`는 저장소에 존재하는 7~40자리 소문자 hex 해시를 받는다. 실행 시 prepare_commit.sh와 같은 canonical short SHA로 정규화하고, 결과에는 full SHA도 기록한다. 작업 트리 대신 그 커밋의 git archive·빌드 산출물을 사용한다. 옵션이 없으면 기존 비교·b86324b 실행 계획을 유지한다.
 
 ```bash
