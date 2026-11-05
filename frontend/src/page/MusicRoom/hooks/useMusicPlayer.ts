@@ -21,6 +21,8 @@ type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
 interface PendingSync {
   timestamp?: number;
   action: string;
+  receivedAt: number;
+  isPlaying: boolean;
 }
 
 interface YouTubeInternalPlayer {
@@ -154,72 +156,81 @@ const useMusicPlayer = ({
     }
   };
 
-  const handleSyncMessage = useEffectEvent((message: SyncSocketMessage) => {
-    const { action, timestamp, videoId, user_id } = message;
+  const handleSyncMessage = useEffectEvent(
+    (message: SyncSocketMessage, receivedAt = performance.now()) => {
+      const { action, timestamp, videoId, user_id } = message;
 
-    if (user?.isHost && user_id === user?.userId) return;
-    if (videoId !== currentSong?.music_url) {
-      if (!user?.isHost && videoId) {
-        earlySyncRef.current = { message, receivedAt: performance.now() };
+      if (user?.isHost && user_id === user?.userId) return;
+      if (videoId !== currentSong?.music_url) {
+        if (!user?.isHost && videoId) {
+          earlySyncRef.current = { message, receivedAt };
+        }
+        return;
       }
-      return;
-    }
 
-    // A seek keeps the previous play/pause state
-    lastSyncRef.current = {
-      timestamp,
-      action:
-        action === 'seek' ? (lastSyncRef.current?.action ?? 'play') : action,
-    };
+      // A seek keeps the previous play/pause state
+      lastSyncRef.current = {
+        timestamp,
+        action:
+          action === 'seek' ? (lastSyncRef.current?.action ?? 'play') : action,
+        receivedAt,
+        isPlaying:
+          action === 'play' ||
+          (action === 'seek' && (lastSyncRef.current?.isPlaying ?? true)),
+      };
 
-    if (!user?.isHost && !isPlayerEnabled) {
-      pendingSyncRef.current = lastSyncRef.current;
-      return;
-    }
-
-    // seekTo is ignored until the player is ready, so apply it in handleReady
-    if (!user?.isHost && !isPlayerReadyRef.current) {
-      if (action === 'play') setIsPlaying(true);
-      if (action === 'pause') setIsPlaying(false);
-      if (timestamp !== undefined) {
-        pendingSyncRef.current = { timestamp, action: 'seek_on_ready' };
+      if (!user?.isHost && !isPlayerEnabled) {
+        pendingSyncRef.current = lastSyncRef.current;
+        return;
       }
-      return;
-    }
 
-    const currentPlayerTime = playerRef.current?.getCurrentTime() || 0;
-
-    if (action === 'play') {
-      clearPendingSeek();
-      setIsPlaying(true);
-
-      if (
-        timestamp !== undefined &&
-        Math.abs(currentPlayerTime - timestamp) >= 2
-      ) {
-        playerRef.current?.seekTo(timestamp, 'seconds');
-        if (duration > 0) setPlayed(timestamp / duration);
+      // seekTo is ignored until the player is ready, so apply it in handleReady
+      if (!user?.isHost && !isPlayerReadyRef.current) {
+        if (action === 'play') setIsPlaying(true);
+        if (action === 'pause') setIsPlaying(false);
+        if (timestamp !== undefined) {
+          pendingSyncRef.current = {
+            ...lastSyncRef.current,
+            action: 'seek_on_ready',
+          };
+        }
+        return;
       }
-    } else if (action === 'pause') {
-      clearPendingSeek();
-      setIsPlaying(false);
 
-      if (timestamp !== undefined) {
-        playerRef.current?.seekTo(timestamp, 'seconds');
-        if (duration > 0) setPlayed(timestamp / duration);
-      }
-    } else if (action === 'seek') {
-      // Debounce seek operations to prevent jitter
-      clearPendingSeek();
+      const currentPlayerTime = playerRef.current?.getCurrentTime() || 0;
 
-      seekTimeoutRef.current = setTimeout(() => {
+      if (action === 'play') {
+        clearPendingSeek();
+        setIsPlaying(true);
+
+        if (
+          timestamp !== undefined &&
+          Math.abs(currentPlayerTime - timestamp) >= 2
+        ) {
+          playerRef.current?.seekTo(timestamp, 'seconds');
+          if (duration > 0) setPlayed(timestamp / duration);
+        }
+      } else if (action === 'pause') {
+        clearPendingSeek();
+        setIsPlaying(false);
+
         if (timestamp !== undefined) {
           playerRef.current?.seekTo(timestamp, 'seconds');
           if (duration > 0) setPlayed(timestamp / duration);
         }
-      }, 100);
-    }
-  });
+      } else if (action === 'seek') {
+        // Debounce seek operations to prevent jitter
+        clearPendingSeek();
+
+        seekTimeoutRef.current = setTimeout(() => {
+          if (timestamp !== undefined) {
+            playerRef.current?.seekTo(timestamp, 'seconds');
+            if (duration > 0) setPlayed(timestamp / duration);
+          }
+        }, 100);
+      }
+    },
+  );
 
   useEffect(() => {
     const unsubscribe = subscribe('sync', (message) => {
@@ -237,18 +248,23 @@ const useMusicPlayer = ({
     if (!early || early.message.videoId !== currentSong?.music_url) return;
 
     earlySyncRef.current = null;
-    const age = performance.now() - early.receivedAt;
+    const now = performance.now();
+    const age = now - early.receivedAt;
     if (age > EARLY_SYNC_MAX_AGE_MS) return;
 
     const { action, timestamp } = early.message;
     logger.log(`[Player] Applying sync received ${Math.round(age)}ms early`);
-    handleSyncMessage({
-      ...early.message,
-      timestamp:
-        action === 'play' && timestamp !== undefined
-          ? timestamp + age / 1000
-          : timestamp,
-    });
+    // A play timestamp already includes age, so its time base also moves to now.
+    handleSyncMessage(
+      {
+        ...early.message,
+        timestamp:
+          action === 'play' && timestamp !== undefined
+            ? timestamp + age / 1000
+            : timestamp,
+      },
+      action === 'play' ? now : early.receivedAt,
+    );
   });
 
   useEffect(() => {
@@ -294,10 +310,14 @@ const useMusicPlayer = ({
   const handlePlay = () => {
     setIsPlaying(true);
     if (user?.isHost && currentSong) {
+      const currentTime = playerRef.current?.getCurrentTime();
       sendMessage({
         type: 'sync',
         action: 'play',
-        timestamp: played * duration,
+        timestamp:
+          typeof currentTime === 'number' && Number.isFinite(currentTime)
+            ? currentTime
+            : played * duration,
         videoId: currentSong.music_url,
       });
     }
@@ -306,10 +326,14 @@ const useMusicPlayer = ({
   const handlePause = () => {
     setIsPlaying(false);
     if (user?.isHost && currentSong) {
+      const currentTime = playerRef.current?.getCurrentTime();
       sendMessage({
         type: 'sync',
         action: 'pause',
-        timestamp: played * duration,
+        timestamp:
+          typeof currentTime === 'number' && Number.isFinite(currentTime)
+            ? currentTime
+            : played * duration,
         videoId: currentSong.music_url,
       });
     }
@@ -330,7 +354,7 @@ const useMusicPlayer = ({
 
   const handleSync = () => {
     const pending = pendingSyncRef.current;
-    const startPlaying = pending?.action === 'play' || !pending;
+    const startPlaying = pending?.isPlaying ?? true;
     const startTimestamp = pending?.timestamp;
 
     setIsPlayerEnabled(true);
@@ -338,8 +362,9 @@ const useMusicPlayer = ({
     setHasUnmuted(true);
     setIsPlaying(startPlaying);
 
-    if (startTimestamp !== undefined) {
+    if (pending && startTimestamp !== undefined) {
       pendingSyncRef.current = {
+        ...pending,
         timestamp: startTimestamp,
         action: 'seek_on_ready',
       };
@@ -372,7 +397,12 @@ const useMusicPlayer = ({
       pending?.action === 'seek_on_ready' &&
       pending.timestamp !== undefined
     ) {
-      playerRef.current?.seekTo(pending.timestamp, 'seconds');
+      const timestamp =
+        pending.timestamp +
+        (pending.isPlaying
+          ? (performance.now() - pending.receivedAt) / 1000
+          : 0);
+      playerRef.current?.seekTo(timestamp, 'seconds');
       pendingSyncRef.current = null;
     }
   };
