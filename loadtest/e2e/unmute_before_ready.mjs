@@ -85,6 +85,7 @@ async function tab(browser, user, result) {
         t, ct: video.currentTime, paused: video.paused, muted: video.muted,
         volume: video.volume, readyState: video.readyState,
         ad: !!document.querySelector('.html5-video-player.ad-showing'),
+        player_classes: document.querySelector('.html5-video-player')?.className ?? null,
       } : { t, none: true }));
     }, 100);
   }, user);
@@ -198,10 +199,16 @@ async function run({ sha, full }, runNumber) {
       && sample.t <= result.interval_end_at && !sample.ad);
     result.sample_count = samples.length;
     result.muted_sample_count = samples.filter(sample => sample.muted === true).length;
+    result.paused_sample_count = samples.filter(sample => sample.paused === true).length;
+    result.sync_button_visible_at_end = await step(page.locator('button.animate-pulse').isVisible());
     if (samples.length < 20) throw new Error(`Only ${samples.length} non-ad samples in the 5-second interval; need at least 20`);
     if (result.muted_sample_count) {
       result.failure_kind = 'assertion';
       result.errors.push(`${result.muted_sample_count}/${samples.length} interval samples were muted after the pre-ready unmute click`);
+    } else if (result.paused_sample_count) {
+      // Sound that never plays is not a fix, so playback must also continue.
+      result.failure_kind = 'assertion';
+      result.errors.push(`${result.paused_sample_count}/${samples.length} interval samples were paused after unmuting`);
     } else if (samples.some(sample => sample.muted !== false)) {
       throw new Error('Interval contains samples without a boolean muted value');
     } else {
