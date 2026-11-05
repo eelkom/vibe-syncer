@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { reconnectDelay, MAX_ATTEMPTS } from '../lib/reconnect-policy.mjs';
+import { receiveControl, controlRows } from './control.mjs';
 const delay = monitorEventLoopDelay({ resolution: 20 }); delay.enable();
 const bots = [], sent = [], control = new Map(), timers = new Set(), aborts = new Set();
 let closed = false, sequence = 0, admissionStart, controlIndex = 0;
@@ -17,12 +18,7 @@ function open(bot, url) {
   socket.on('message', buffer => {
     bot.received++;
     // Parse markers only, never JSON-decode every join/welcome/chat frame.
-    if (bot.id === controlIndex) {
-      const text = buffer.toString();
-      for (const m of text.matchAll(/c-([bg]\d*)-(\d+)-(\d+)/g)) {
-        const key = m[0]; control.set(key, (control.get(key) ?? 0) + 1);
-      }
-    }
+    if (bot.id === controlIndex) receiveControl(control, buffer);
   });
   socket.on('close', code => {
     bot.connected = false; bot.closes.push([Date.now(), code]);
@@ -57,7 +53,7 @@ function sendOne(id) {
   }
 }
 function snapshot() {
-  return { ...status(), admission_started_at: admissionStart, sent, control: [...control],
+  return { ...status(), admission_started_at: admissionStart, sent, control: controlRows(control),
     event_loop: { max_ms: delay.count ? delay.max / 1e6 : null, p95_ms: delay.count ? delay.percentile(95) / 1e6 : null },
     bots: bots.map(({ socket, ...bot }) => bot) };
 }

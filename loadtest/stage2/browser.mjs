@@ -3,26 +3,32 @@ import { readFileSync } from 'node:fs';
 import { ROOT, FRONT, until } from '../lib/common.mjs';
 import { tab as stage1Tab, selectors, scriptedUser } from '../lib/browser.mjs';
 import { installCollector } from './collector.mjs';
+import { ownBrowser } from './browser-process.mjs';
 const { chromium } = await import('playwright');
-export async function launchStage2(cleanup, precise = false) {
-  const browser = await chromium.launch({ headless: true, args: ['--autoplay-policy=no-user-gesture-required', '--mute-audio',
+export async function launchStage2(browsers, precise = false) {
+  const server = await chromium.launchServer({ host: '127.0.0.1', headless: true, args: ['--autoplay-policy=no-user-gesture-required', '--mute-audio',
     '--disable-features=HardwareMediaKeyHandling', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1', ...(precise ? ['--enable-precise-memory-info'] : [])] });
-  cleanup.push(() => browser.close()); return browser;
+  let owner;
+  try { owner = ownBrowser(server); } catch (error) { await server.kill(); throw error; }
+  browsers.push(owner);
+  owner.browser = await chromium.connect(server.wsEndpoint()); return owner.browser;
 }
 export async function makePage(browser, identity, result, cleanup, profiling = false, checkpoints = []) {
   let state;
   if (identity) {
-    state = await stage1Tab(browser, identity, result, cleanup, 'muted-allowed', false);
+    // The owned browser closes all contexts. A per-context close can hang on
+    // an unresponsive renderer before the browser's forced-exit path runs.
+    state = await stage1Tab(browser, identity, result, [], 'muted-allowed', false);
     // Stage2 keeps only sync frames and one readiness token in Node memory.
     state.page.removeAllListeners('websocket');
   } else {
     // Joiner deliberately has no sessionStorage initializer; REST/UI logs in.
-    const context = await browser.newContext({ serviceWorkers: 'block' }); cleanup.push(() => context.close());
+    const context = await browser.newContext({ serviceWorkers: 'block' });
     state = { page: await context.newPage(), frames: [], sent: [], attempts: [], clicks: [], consoleErrors: [] };
     state.page.on('request', req => { if (new URL(req.url()).hostname !== '127.0.0.1') result.blocked_external_requests++; });
   }
   state.page.removeAllListeners('console'); state.page.removeAllListeners('pageerror');
-  state.controls = {}; state.connected = false; state.checkpoints = []; state.delivered = new Set(); state.console_error_count = 0;
+  state.controls = {}; state.connected = false; state.checkpoints = []; state.delivered = new Set(); state.deliveredAt = new Map(); state.connectionEvents = []; state.console_error_count = 0;
   const vitals = readFileSync(path.join(ROOT, 'node_modules/web-vitals/dist/web-vitals.iife.js'), 'utf8');
   await state.page.addInitScript({ content: vitals + '\n;window.webVitals=webVitals;' });
   await state.page.addInitScript(installCollector, { profiling, checkpoints });
@@ -31,7 +37,9 @@ export async function makePage(browser, identity, result, cleanup, profiling = f
     const text = msg.text();
     if (msg.type() === 'error') { state.console_error_count++; if (state.consoleErrors.length < 20) state.consoleErrors.push(text.slice(0, 500)); }
     for (const [prefix, receive] of [['__stage2_controls ', value => { state.controls = value.controls; state.media = value.media; state.media_at = value.t; }],
-      ['__stage2_delivered ', value => { state.delivered.add(value.marker); }], ['__stage2_ws ', value => { state.connected = value.connected; if (value.connected) state.connected_at = value.t; }], ['__stage2_checkpoint ', value => { state.checkpoints.push(value); state.onCheckpoint?.(value); }]]) {
+      ['__stage2_delivered ', value => { state.delivered.add(value.marker); if (!state.deliveredAt.has(value.marker)) state.deliveredAt.set(value.marker, value.t); }],
+      ['__stage2_ws ', value => { state.connected = value.connected; state.connectionEvents.push(value); if (value.connected) state.connected_at = value.t; }],
+      ['__stage2_checkpoint ', value => { state.checkpoints.push(value); state.onCheckpoint?.(value); }]]) {
       if (text.startsWith(prefix)) receive(JSON.parse(text.slice(prefix.length)));
     }
   });

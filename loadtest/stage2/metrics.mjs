@@ -1,5 +1,6 @@
 import { firstPlayback } from '../lib/stats.mjs';
-import { delivery, distribution, correctionSeeks, errorWindows, interactionCandidates, machineStatus } from './stats.mjs';
+import { delivery, distribution, correctionSeeks, errorWindows, interactionCandidates, sampleGapMetrics } from './stats.mjs';
+import { controlDelivery } from './control.mjs';
 const within = (rows, start, end) => rows.filter(r => (r[0] ?? r.t) >= start && (r[0] ?? r.t) <= end);
 export function pageMetrics(data, start, end, profiling) {
   if (!data) return Object.fromEntries(['inp_ms', 'input_count', 'long_task_count', 'long_task_sum_ms', 'dropped_frames', 'total_frames',
@@ -20,6 +21,14 @@ function gaveUp(ws, end) {
   return retries.length >= 5 && last?.close_at !== null && end - last?.close_at >= 1000 ? 1 : 0;
 }
 const tupleSamples = samples => samples.map(s => s.none ? [s.t, null] : [s.t, s.ct, s.paused, s.muted, s.volume]);
+export function consoleObservations(ctx) {
+  const saved = state => state ? { delivered: state.deliveredAt ? [...state.deliveredAt] : [...state.delivered ?? []].map(marker => [marker, null]),
+    unique_guest_markers: state.delivered?.size ?? null, checkpoints: [...state.checkpoints ?? []],
+    connected: state.connected ?? null, connected_at: state.connected_at ?? null, connection_events: [...state.connectionEvents ?? []],
+    media: state.media ?? null, media_at: state.media_at ?? null, console_error_count: state.console_error_count ?? null,
+    console_errors: [...state.consoleErrors ?? []] } : null;
+  return { host: saved(ctx?.host), guest: saved(ctx?.guest), entrant: saved(ctx?.joiner) };
+}
 export function metrics(ctx, host, guest, bots, joiner) {
   const end = ctx.end, start = ctx.start;
   const botSent = bots.sent.filter(entry => entry[3] === true);
@@ -33,6 +42,7 @@ export function metrics(ctx, host, guest, bots, joiner) {
   const errors = host && guest ? errorWindows(host.samples, guest.samples, ctx.actions, end) : { steady: distribution([]), join: distribution([]) };
   const firstPause = ctx.actions.find(a => a.action === 'pause')?.t ?? Infinity;
   const aggregate = { ...pageMetrics(guest, start, ctx.trafficEnd ?? end, ctx.job.profiling), ...chat,
+    ...controlDelivery(sent, bots.control, guestSent), console_observations: consoleObservations(ctx),
     err_ms: errors.steady, join_err_ms: errors.join,
     err_p50: errors.steady.p50, err_p75: errors.steady.p75, err_p95: errors.steady.p95,
     join_err_p50: errors.join.p50, join_err_p75: errors.join.p75, join_err_p95: errors.join.p95,
@@ -71,12 +81,12 @@ export function metrics(ctx, host, guest, bots, joiner) {
   }
   aggregate.raw = { sample_columns: ['t', 'ct (null = absent)', 'paused', 'muted', 'volume'], host_samples: host ? tupleSamples(host.samples) : null, guest_samples: guest ? tupleSamples(guest.samples) : null,
     joiner_samples: joiner ? tupleSamples(joiner.samples) : null,
-    bot_sent: bots.sent, guest_sent: guest?.sent ?? null, displayed: guest?.displayed ?? null, inputs: ctx.inputs, actions: ctx.actions, host_action_failures: ctx.host_action_failures ?? [],
+    bot_sent: bots.sent, control_received: bots.control, guest_sent: guest?.sent ?? null, displayed: guest?.displayed ?? null, inputs: ctx.inputs, actions: ctx.actions, host_action_failures: ctx.host_action_failures ?? [],
     longtasks: guest?.longtasks ?? null, heap: guest?.memory ?? null, inp: guest?.inp ?? null, raf: guest?.raf ?? null,
     commit_durations: ctx.job.profiling && guest ? guest.commits.map(c => c[1]) : null,
     seeks: guest?.seeks ?? null, sync: guest?.sync ?? null, host_ws: host?.ws ?? null, guest_ws: guest?.ws ?? null, joiner_ws: joiner?.ws ?? null,
     bots: bots.bots, start, end, traffic_end: ctx.trafficEnd ?? end };
-  return Object.assign(aggregate, machineStatus({ metrics: aggregate }));
+  return Object.assign(aggregate, sampleGapMetrics({ metrics: aggregate }));
 }
 export function boundedJSON(record) {
   let text = JSON.stringify(record);

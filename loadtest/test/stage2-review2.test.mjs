@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { seekCoordinates, hostAction } from '../stage2/scenarios.mjs';
-import { maxSampleGap, machineStatus, verdict, shouldStopBatch } from '../stage2/stats.mjs';
+import { maxSampleGap, sampleGapMetrics, machineStatus, verdict, shouldStopBatch } from '../stage2/stats.mjs';
 import { options, shouldRun, skipAfterFailures } from '../stage2/config.mjs';
 import { metrics } from '../stage2/metrics.mjs';
 import { summarizeStage2, renderStage2 } from '../summarize_stage2.mjs';
@@ -38,16 +38,17 @@ test('sample gaps include pre-observation absent-media rows, never cross between
   assert.equal(maxSampleGap([[0],[100],[100]]), 100);
 });
 const round = metrics => ({ scenario: 'chat_burst', condition: 'default', n: 2, ok: true, metrics });
-test('machine stall is strictly >5000ms, with legacy raw fallback overriding stale stored metrics', () => {
+test('sample gaps remain diagnostic and only the stored OS flag decides a stall', () => {
   const boundary = round({ raw: { host_samples: [[0],[5000]] } });
   assert.equal(machineStatus(boundary).machine_stalled, false);
   const old = round({ max_sample_gap_ms: 100, raw: { host_samples: [[0],[100]], guest_samples: [[1],[37001]] } });
-  assert.deepEqual(machineStatus(old), { max_sample_gap_ms: 37000, machine_stalled: true });
+  assert.deepEqual(sampleGapMetrics(old), { max_gap_host_ms: 100, max_gap_guest_ms: 37000, max_sample_gap_ms: 37000 });
+  assert.equal(machineStatus(old).machine_stalled, false);
   assert.equal(machineStatus(round({ machine_stalled: true, max_sample_gap_ms: 100 })).machine_stalled, true);
-  assert.equal(machineStatus(round({})).max_sample_gap_ms, null);
+  assert.equal(sampleGapMetrics(round({})).max_sample_gap_ms, null);
 });
 test('script-failed stalled rounds are only INVALID, retain errors and do not stop the batch', () => {
-  const run = { ...round({ lost: 10, host_action_timeouts: 2, raw: { guest_samples: [[0],[1010000]] } }),
+  const run = { ...round({ machine_stalled: true, lost: 10, host_action_timeouts: 2, raw: { guest_samples: [[0],[1010000]] } }),
     ok: false, errors: ['original failure'], server: { queuepool_errors: 100 } };
   const before = JSON.stringify(run), decision = verdict(run);
   assert.equal(decision.status, 'INVALID'); assert.equal(decision.pass, null);
@@ -62,11 +63,12 @@ test('normal metrics calculate the full-page gap even before the measurement win
   const ctx = { start: 10000, end: 11000, job: { scenario: 'steady', n: 2 }, actions: [], inputs: [] };
   const bots = { sent: [], control: [], bots: [], gave_up: 0, event_loop: {} };
   const m = metrics(ctx, page(), page(), bots);
-  assert.equal(m.max_sample_gap_ms, 6001); assert.equal(m.machine_stalled, true);
+  assert.equal(m.max_sample_gap_ms, 6001); assert.equal(m.max_gap_host_ms, 6001); assert.equal(m.max_gap_guest_ms, 6001);
+  assert.equal(machineStatus({ metrics: m }).machine_stalled, false);
 });
 test('summary excludes invalid values and failures, counts them, and leaves all-invalid N neutral', () => {
   const valid = round({ inp_ms: 100, delivery_ms: { p95: 500 } });
-  const invalid = { ...round({ inp_ms: 9999, lost: 99, raw: { guest_samples: [[0],[6000]] } }), ok: false };
+  const invalid = { ...round({ machine_stalled: true, inp_ms: 9999, lost: 99, raw: { guest_samples: [[0],[6000]] } }), ok: false };
   const before = JSON.stringify([valid,invalid]);
   const group = summarizeStage2([valid,invalid])[0];
   assert.equal(group.status, 'PASS'); assert.equal(group.rounds, 2); assert.equal(group.invalid_machine_stall, 1);
@@ -84,7 +86,7 @@ test('rerun-invalid selects only existing stalled rounds; force still selects th
   const rerun = options(['--rerun-invalid','--scenario','chat_burst']);
   const legacy = round({ raw: { host_samples: [[0],[6000]] } });
   assert.equal(rerun.rerunInvalid, true); assert.equal(rerun.scenario, 'chat_burst');
-  assert.equal(shouldRun(legacy, rerun), true);
+  assert.equal(shouldRun(legacy, rerun), false);
   assert.equal(shouldRun(round({ machine_stalled: true }), rerun), true);
   assert.equal(shouldRun(round({}), rerun), false);
   assert.equal(shouldRun({ ...round({}), ok: false }, rerun), false);
@@ -96,7 +98,7 @@ test('rerun-invalid selects only existing stalled rounds; force still selects th
 });
 test('invalid setup failures cannot trigger the larger-pool-N skip rule', () => {
   const job = { scenario: 'steady', condition: 'pool-250', n: 50 };
-  const bad = { ...job, n: 25, ok: true, setup_failed: true, metrics: { raw: { host_samples: [[0],[6000]] } } };
+  const bad = { ...job, n: 25, ok: true, setup_failed: true, metrics: { machine_stalled: true, raw: { host_samples: [[0],[6000]] } } };
   assert.equal(skipAfterFailures(job, [bad,bad,bad], 3), false);
 });
 test('power source parses the first pmset line only and records start/end without guessing', () => {

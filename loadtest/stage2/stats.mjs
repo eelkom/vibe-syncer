@@ -49,12 +49,16 @@ export function maxSampleGap(...series) {
   }
   return maximum;
 }
-export function machineStatus(run) {
+export function sampleGapMetrics(run) {
   const m = run.metrics ?? {}, raw = m.raw ?? {};
-  const gaps = [m.max_sample_gap_ms, maxSampleGap(raw.host_samples, raw.guest_samples)].filter(Number.isFinite);
-  const maximum = gaps.length ? Math.max(...gaps) : null;
-  return { max_sample_gap_ms: maximum, machine_stalled: m.machine_stalled === true || run.machine_stalled === true || maximum > 5000 };
+  const host = maxSampleGap(raw.host_samples) ?? m.max_gap_host_ms ?? null;
+  const guest = maxSampleGap(raw.guest_samples) ?? m.max_gap_guest_ms ?? null;
+  const gaps = [host, guest].filter(Number.isFinite);
+  return { max_gap_host_ms: host, max_gap_guest_ms: guest,
+    max_sample_gap_ms: gaps.length ? Math.max(...gaps) : m.max_sample_gap_ms ?? null };
 }
+// Verdicts, reruns and summaries use only the saved OS-based flag.
+export function machineStatus(run) { return { machine_stalled: (run.metrics?.machine_stalled ?? run.machine_stalled) === true }; }
 export function shouldStopBatch(run) { return !run.ok && !machineStatus(run).machine_stalled; }
 export function verdict(run) {
   if (machineStatus(run).machine_stalled) return { status: 'INVALID', pass: null, reasons: ['INVALID_MACHINE_STALL'], external: {} };

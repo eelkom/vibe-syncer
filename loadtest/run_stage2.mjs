@@ -13,9 +13,11 @@ import { launchStage2, makePage, navigate, readyGuest, readPage } from './stage2
 import { startBots } from './stage2/bots.mjs';
 import { monitorServer, serverSummary } from './stage2/monitor.mjs';
 import { runScenario } from './stage2/scenarios.mjs';
-import { metrics, boundedJSON } from './stage2/metrics.mjs';
-import { verdict, machineStatus, shouldStopBatch } from './stage2/stats.mjs';
+import { metrics, boundedJSON, consoleObservations } from './stage2/metrics.mjs';
+import { verdict, sampleGapMetrics, shouldStopBatch } from './stage2/stats.mjs';
 import { capturePower, warnBattery } from './stage2/power.mjs';
+import { readSleepLog, sleepStatus } from './stage2/sleep.mjs';
+import { closeOwnedBrowser } from './stage2/browser-process.mjs';
 const opts = options(process.argv.slice(2)), jobs = plan(opts);
 const root = path.join(ROOT, opts.smoke ? 'results/smoke/stage2' : 'results/stage2');
 await mkdir(root, { recursive: true }); await mkdir(path.join(ROOT, '.logs'), { recursive: true });
@@ -46,7 +48,7 @@ try {
     const result = { stage: 2, scenario: job.scenario, commit: SHA, commit_full: full, condition: job.condition, n: job.n, run: job.run,
       smoke: opts.smoke, profiling: job.profiling, cpu_throttle: job.cpu, measurement_pool_size: job.pool,
       environment: path.relative(ROOT, envPath), started_at: new Date().toISOString(), phase: 'init', ok: false, skipped: false,
-      setup_failed: false, connected_at_setup: 0, blocked_external_requests: 0, server_forced_kills: 0, errors: [], metrics: {} };
+      setup_failed: false, connected_at_setup: 0, blocked_external_requests: 0, server_forced_kills: 0, browser_forced_kills: 0, errors: [], metrics: {} };
     capturePower(result, 'start');
     if (skipAfterFailures(job, previous, 3)) {
       result.skipped = true; result.ok = true; result.skip_reason = 'SMALLER_N_SETUP_FAILED_ALL_3'; result.verdict = verdict(result);
@@ -55,7 +57,7 @@ try {
     }
     const database = `loadtest_s2_${job.scenario}_${job.n}_${job.run}`;
     const instrument = path.join(ROOT, '.logs', `stage2-${job.scenario}-${job.condition}-${job.n}-${job.run}-${stamp}.jsonl`);
-    const cleanup = []; let created = false, server, monitor, bots, ctx, hostData, guestData, joinData, botData;
+    const cleanup = [], browsers = []; let created = false, server, monitor, bots, ctx, hostData, guestData, joinData, botData;
     console.log(`RUN ${job.scenario} ${job.condition} N=${job.n} #${job.run}`);
     try {
       result.phase = 'database'; await createDatabase(database); created = true;
@@ -66,7 +68,7 @@ try {
       const front = await staticServer(path.join(ROOT, '.baselines', SHA, 'frontend', job.profiling ? 'dist-profiling' : 'dist'), 15173, true); cleanup.push(() => front.close());
       ctx = { job, smoke: opts.smoke, cleanup, result, seed, inputs: [], actions: [], checkpointInputs: [] };
       result.phase = 'browsers';
-      const hb = await launchStage2(cleanup), gb = await launchStage2(cleanup, true);
+      const hb = await launchStage2(browsers), gb = await launchStage2(browsers, true);
       env.chromium_version = gb.version(); await writeFile(envPath, JSON.stringify(env, null, 2) + '\n');
       const host = ctx.host = await makePage(hb, seed.host, result, cleanup, job.profiling);
       await navigate(host, seed.room);
@@ -76,10 +78,10 @@ try {
       await readyHost(host, seed.room, true);
       if (job.cpu === 4) {
         const cdp = await guest.page.context().newCDPSession(guest.page);
-        await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 }); cleanup.push(() => cdp.detach());
+        await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 }); // Session is disposed with its owned browser.
       }
       let joiner;
-      if (job.scenario === 'join_burst') joiner = await makePage(await launchStage2(cleanup), null, result, cleanup);
+      if (job.scenario === 'join_burst') joiner = await makePage(await launchStage2(browsers), null, result, cleanup);
       bots = await startBots();
       Object.assign(ctx, { joiner, bots });
       result.phase = 'observation'; await runScenario(ctx);
@@ -114,7 +116,14 @@ try {
         if (hostData) result.metrics.raw.host_samples = hostData.samples.map(s => [s.t,s.ct ?? null,s.paused,s.muted,s.volume]);
         if (guestData) result.metrics.raw.guest_samples = guestData.samples.map(s => [s.t,s.ct ?? null,s.paused,s.muted,s.volume]);
       }
+      result.metrics.console_observations ??= consoleObservations(ctx);
       for (const close of cleanup.reverse()) try { await deadline(close(), 10000, 'stage2 resource cleanup'); } catch (error) { result.errors.push(`cleanup: ${error.message}`); result.ok = false; }
+      result.browser_pids = browsers.map(owner => owner.pid);
+      for (const owner of browsers.reverse()) {
+        try { await closeOwnedBrowser(owner); }
+        catch (error) { result.errors.push(`browser cleanup pid=${owner.pid}: ${error.message}`); result.ok = false; result.browser_cleanup_failed = true; }
+        finally { if (owner.forced) result.browser_forced_kills++; }
+      }
       if (server) try { if ((await server.stop()).forced) result.server_forced_kills++; } catch (error) { result.errors.push(`server stop: ${error.message}`); result.ok = false; }
       if (monitor) {
         await monitor.stop();
@@ -123,14 +132,19 @@ try {
       result.server_summary = serverSummary(result.server, ctx?.start, ctx?.end, result.server_forced_kills);
       if (created) try { await dropDatabase(database); } catch (error) { result.errors.push(`DB cleanup: ${error.message}`); result.ok = false; }
       delete result.browser_artifacts;
-      Object.assign(result.metrics, machineStatus(result));
+      Object.assign(result.metrics, sampleGapMetrics(result));
       capturePower(result, 'end');
-      result.finished_at = new Date().toISOString(); result.verdict = verdict(result);
+      result.finished_at = new Date().toISOString();
+      try { Object.assign(result.metrics, sleepStatus(result.started_at, result.finished_at, readSleepLog())); }
+      catch (error) { Object.assign(result.metrics, sleepStatus(result.started_at, result.finished_at, null)); result.machine_stall_log_error = error.message; }
+      result.verdict = verdict(result);
       boundedJSON(result); result.verdict = verdict(result);
       await writeFile(target, boundedJSON(result), { flag: existingText !== undefined ? 'w' : 'wx' });
       previous.push(result); console.log(`${result.verdict.status === 'INVALID' ? 'INVALID' : result.ok ? result.setup_failed ? 'SETUP_FAILED' : 'OK' : 'SCRIPT_FAILED'} ${path.relative(ROOT, target)}`);
     }
-    if (shouldStopBatch(result)) { process.exitCode = 1; break; }
+    // Never start another round after a browser exit/cleanup could not be
+    // confirmed, even if OS Sleep also invalidated this round's measurements.
+    if (result.browser_cleanup_failed || shouldStopBatch(result)) { process.exitCode = 1; break; }
   }
 } finally {
   try { if (envPath) { capturePower(env, 'end'); await writeFile(envPath, JSON.stringify(env, null, 2) + '\n'); } }

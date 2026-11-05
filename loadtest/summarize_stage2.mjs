@@ -5,7 +5,8 @@ import { ROOT } from './lib/common.mjs';
 import { readRuns } from './summarize.mjs';
 import { median, numeric } from './lib/stats.mjs';
 import { verdict, machineStatus } from './stage2/stats.mjs';
-const fields = ['inp_ms', 'delivery_ms.p50', 'delivery_ms.p75', 'delivery_ms.p95', 'err_p50', 'err_p75', 'err_p95',
+const fields = ['inp_ms', 'delivery_ms.p50', 'delivery_ms.p75', 'delivery_ms.p95',
+  'control_delivery_ms.p50', 'control_delivery_ms.p75', 'control_delivery_ms.p95', 'err_p50', 'err_p75', 'err_p95',
   'join_err_p50', 'join_err_p75', 'join_err_p95', 'join_ms', 'bot_join_ms.p50', 'bot_join_ms.p75', 'bot_join_ms.p95',
   'lost', 'duplicates', 'server_side_lost', 'play_correction_seeks', 'input_count', 'long_task_count', 'long_task_sum_ms',
   'dropped_frames', 'total_frames', 'react_commits', 'react_commit_ms.p50', 'react_commit_ms.p75', 'react_commit_ms.p95',
@@ -14,7 +15,7 @@ const fields = ['inp_ms', 'delivery_ms.p50', 'delivery_ms.p75', 'delivery_ms.p95
   'connected_at_setup', 'server_summary.event_loop_max_ms', 'server_summary.event_loop_p95_ms_approx_max',
   'server_summary.broadcast_p95_ms_approx_max', 'server_summary.broadcast_sum_ms', 'server_summary.connections_max',
   'server_summary.pool_checked_out_max', 'server_summary.cpu_peak', 'server_summary.rss_peak_bytes',
-  'server_summary.queuepool_errors', 'server_summary.server_forced_kills'];
+  'server_summary.queuepool_errors', 'server_summary.server_forced_kills', 'browser_forced_kills'];
 export function summarizeStage2(runs) {
   const groups = new Map();
   for (const run of runs) {
@@ -31,7 +32,7 @@ export function summarizeStage2(runs) {
         decisions.some(d => d.external?.[k] === true) ? true : decisions.some(d => d.external?.[k] === false) ? false : null])),
       metrics: Object.fromEntries(fields.map(field => {
         const values = numeric(active.map(r => field.split('.').reduce((obj, key) => obj?.[key],
-          field === 'connected_at_setup' || field.startsWith('server_summary.') ? r : r.metrics)));
+          ['connected_at_setup','browser_forced_kills'].includes(field) || field.startsWith('server_summary.') ? r : r.metrics)));
         return [field, { median: median(values), max: values.length ? Math.max(...values) : null, missing: active.length - values.length }];
       })) };
   });
@@ -40,7 +41,7 @@ export function renderStage2(groups) {
   const fmt = v => v === null ? 'null' : typeof v === 'number' ? String(Number(v.toFixed(3))) : v ? '초과' : '이하';
   const lines = ['# Stage 2 결과', '',
     '합격 규칙은 2026-11-04 확정한 값이다. 유효 회차 중 한 회차라도 서비스/연결 불합격 사유가 있으면 해당 N은 FAIL이다. 스크립트 실패도 FAIL로 표시한다.', '',
-    '호스트·관찰자의 회차 전체 샘플(측정 시작 전 포함)에서 최대 인접 간격이 5000ms를 넘거나 machine_stalled=true이면 INVALID_MACHINE_STALL이다. 「머신 정지 무효 회차」로 세고 판정·통계·결측 집계에서 제외한다. 전부 무효이면 INVALID다. 기존 원본도 metrics.raw 샘플로 다시 판별하며 원본은 변경하지 않는다.', '',
+    '무효 판정은 저장된 machine_stalled만 사용한다. 회차 시작~끝 사이 pmset -g log의 Sleep 도메인 기록이 있으면 true이며 INVALID_MACHINE_STALL이다. 「머신 정지 무효 회차」로 세고 판정·통계·결측 집계에서 제외한다. 전부 무효이면 INVALID다. 샘플 간격은 페이지 병목의 기록 지표이며 무효 사유가 아니다. machine_stall_unknown은 OS 로그 보존 기간 부족 등으로 확인할 수 없는 회차이고 자동 제외하지 않는다. 기존 원본은 recompute_stage2_stall.mjs로 재계산한 뒤 요약한다.', '',
     'default는 풀을 수정하지 않은 서버의 약 15연결 한계를 측정한다. pool-250은 풀 상한 250으로 다음 병목을 찾는 진단용이며 원래 서버의 수용량과 구분한다.', '',
     'INP 200ms·전달 지연 p95 1000ms는 이 시험 조건의 외부 기준 지표로 초과 여부를 별도 표시한다. err_p95 500ms는 공인 기준이 없는 자체 목표다. 이 초과 표시는 서비스 실패 코드와 별도로 제시한다.', '',
     '봇 이벤트 루프 지연 p95 > 100ms는 「측정기 부하」로 표시한다. 이 경우 지연 지표를 믿기 어렵다. 집계에서 제외하지 않는다. 숫자는 회차 중앙값·최댓값이며 결측은 0으로 만들지 않는다. Long Task와 버려진 프레임은 기록 지표다.', '',
