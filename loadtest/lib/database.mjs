@@ -22,11 +22,12 @@ export async function guest(room, nickname) {
   const g = await rest('/rooms/join', { room_code: room.room_code, nickname });
   return { userId: g.user_id, nickname, isHost: false, token: g.token };
 }
-export async function seed(database) {
+export async function seed(database, { queue = true } = {}) {
   const room = await rest('/rooms/', { name: 'Stage1', host_nickname: 'host' });
   const host = { userId: room.host_id, nickname: 'host', isHost: true, token: room.token };
   const g = await guest(room, 'observer');
   const sender = await guest(room, 'sender');
+  if (!queue) return { room, host, guest: g, sender };
   const client = new pg.Client({ ...DB, database });
   await client.connect();
   try {

@@ -35,8 +35,12 @@ const MusicRoom = () => {
   );
 
   useEffect(() => {
-    return subscribe('queue_update', () => {
-      queryClient.invalidateQueries({ queryKey: ['queueList', roomCode] });
+    return subscribe('queue_update', async () => {
+      const queryKey = ['queueList', roomCode];
+      // Without data yet, invalidate alone reuses the in-flight first fetch and
+      // its response predates this update, so cancel that fetch first.
+      await queryClient.cancelQueries({ queryKey });
+      await queryClient.invalidateQueries({ queryKey });
     });
   }, [subscribe, queryClient, roomCode]);
 
