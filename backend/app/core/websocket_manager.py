@@ -73,6 +73,7 @@ class ConnectionManager:
             return None
 
         snapshot = dict(state)
+        snapshot["snapshot"] = True
         playback = self.room_playback.get(room_id)
         if playback is None:
             return snapshot

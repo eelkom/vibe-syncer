@@ -16,6 +16,8 @@ const AUTOPLAY_TIMEOUT_MS = 2000;
 // A sync for a song that isn't current yet is dropped after this time
 const EARLY_SYNC_MAX_AGE_MS = 10000;
 
+const HOST_SYNC_INTERVAL_MS = 5000;
+
 type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
 
 interface PendingSync {
@@ -44,6 +46,7 @@ interface UseMusicPlayerProps {
   roomCode: string;
   sendMessage: (messageData: object) => void;
   subscribe: SubscribeSocket;
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   user: UserData | null;
   currentSong: QueueResponse | undefined;
   onSongEnded?: () => void;
@@ -53,6 +56,7 @@ const useMusicPlayer = ({
   roomCode,
   sendMessage,
   subscribe,
+  connectionStatus,
   user,
   currentSong,
   onSongEnded,
@@ -71,6 +75,8 @@ const useMusicPlayer = ({
   // Ready state of the currently mounted player (it remounts on every song)
   const isPlayerReadyRef = useRef(false);
   const isActuallyPlayingRef = useRef(false);
+  const hostPlayingRef = useRef(false);
+  const hostHasPlayedRef = useRef(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
@@ -102,8 +108,8 @@ const useMusicPlayer = ({
 
   useEffect(() => {
     queueMicrotask(() => {
-      // Guests that already have the host state for this song follow it
-      if (!user?.isHost && lastSyncRef.current) return;
+      // Follow any host state already received for this song
+      if (lastSyncRef.current) return;
       setIsPlaying(true);
     });
   }, [currentSong, user?.isHost]);
@@ -111,9 +117,56 @@ const useMusicPlayer = ({
   useEffect(() => {
     isPlayerReadyRef.current = false;
     isActuallyPlayingRef.current = false;
+    hostPlayingRef.current = false;
     pendingSyncRef.current = null;
     lastSyncRef.current = null;
   }, [currentSong?.music_url]);
+
+  const getPlaybackTime = () => {
+    const currentTime = playerRef.current?.getCurrentTime();
+    return typeof currentTime === 'number' && Number.isFinite(currentTime)
+      ? currentTime
+      : played * duration;
+  };
+
+  const sendHostState = (action: 'play' | 'pause') => {
+    if (!user?.isHost || !currentSong) return;
+
+    sendMessage({
+      type: 'sync',
+      action,
+      timestamp: getPlaybackTime(),
+      videoId: currentSong.music_url,
+    });
+  };
+
+  const sendPeriodicHostState = useEffectEvent(() => {
+    if (hostPlayingRef.current) sendHostState('play');
+  });
+
+  useEffect(() => {
+    if (!user?.isHost || !currentSong?.music_url) return;
+
+    const timer = setInterval(() => {
+      sendPeriodicHostState();
+    }, HOST_SYNC_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, [currentSong?.music_url, user?.isHost]);
+
+  const sendHostStateOnConnect = useEffectEvent(() => {
+    if (!user?.isHost) return;
+
+    if (hostPlayingRef.current) {
+      sendHostState('play');
+    } else if (isPlayerReadyRef.current && !isPlaying) {
+      sendHostState('pause');
+    }
+  });
+
+  useEffect(() => {
+    if (connectionStatus === 'connected') sendHostStateOnConnect();
+  }, [connectionStatus]);
 
   useEffect(() => {
     if (guestPlaybackMode) {
@@ -160,9 +213,13 @@ const useMusicPlayer = ({
     (message: SyncSocketMessage, receivedAt = performance.now()) => {
       const { action, timestamp, videoId, user_id } = message;
 
-      if (user?.isHost && user_id === user?.userId) return;
+      const isRestoringHost =
+        user?.isHost && message.snapshot && !hostHasPlayedRef.current;
+      const shouldFollowSync = !user?.isHost || isRestoringHost;
+
+      if (user?.isHost && user_id === user?.userId && !isRestoringHost) return;
       if (videoId !== currentSong?.music_url) {
-        if (!user?.isHost && videoId) {
+        if (shouldFollowSync && videoId) {
           earlySyncRef.current = { message, receivedAt };
         }
         return;
@@ -179,13 +236,13 @@ const useMusicPlayer = ({
           (action === 'seek' && (lastSyncRef.current?.isPlaying ?? true)),
       };
 
-      if (!user?.isHost && !isPlayerEnabled) {
+      if (shouldFollowSync && !isPlayerEnabled) {
         pendingSyncRef.current = lastSyncRef.current;
         return;
       }
 
       // seekTo is ignored until the player is ready, so apply it in handleReady
-      if (!user?.isHost && !isPlayerReadyRef.current) {
+      if (shouldFollowSync && !isPlayerReadyRef.current) {
         if (action === 'play') setIsPlaying(true);
         if (action === 'pause') setIsPlaying(false);
         if (timestamp !== undefined) {
@@ -273,70 +330,34 @@ const useMusicPlayer = ({
 
   const handlePlayNext = () => {
     if (user?.isHost && currentSong) {
+      hostPlayingRef.current = false;
       playNext();
-      sendMessage({
-        type: 'sync',
-        action: 'play',
-        timestamp: 0,
-        videoId: currentSong.music_url,
-      });
     }
   };
 
   const handlePlayPrev = () => {
     if (user?.isHost && currentSong) {
+      hostPlayingRef.current = false;
       playPrev();
-      sendMessage({
-        type: 'sync',
-        action: 'play',
-        timestamp: 0,
-        videoId: currentSong.music_url,
-      });
     }
   };
 
   const handleJumpSong = (itemId: number) => {
     if (user?.isHost) {
+      hostPlayingRef.current = false;
       jumpSong(itemId);
-      sendMessage({
-        type: 'sync',
-        action: 'play',
-        timestamp: 0,
-        videoId: currentSong?.music_url,
-      });
     }
   };
 
   const handlePlay = () => {
     setIsPlaying(true);
-    if (user?.isHost && currentSong) {
-      const currentTime = playerRef.current?.getCurrentTime();
-      sendMessage({
-        type: 'sync',
-        action: 'play',
-        timestamp:
-          typeof currentTime === 'number' && Number.isFinite(currentTime)
-            ? currentTime
-            : played * duration,
-        videoId: currentSong.music_url,
-      });
-    }
+    sendHostState('play');
   };
 
   const handlePause = () => {
     setIsPlaying(false);
-    if (user?.isHost && currentSong) {
-      const currentTime = playerRef.current?.getCurrentTime();
-      sendMessage({
-        type: 'sync',
-        action: 'pause',
-        timestamp:
-          typeof currentTime === 'number' && Number.isFinite(currentTime)
-            ? currentTime
-            : played * duration,
-        videoId: currentSong.music_url,
-      });
-    }
+    hostPlayingRef.current = false;
+    sendHostState('pause');
   };
 
   const handleSeek = (amount: number) => {
@@ -416,6 +437,7 @@ const useMusicPlayer = ({
   };
 
   const handleEnded = async () => {
+    hostPlayingRef.current = false;
     setIsPlaying(false);
     onSongEnded?.();
   };
@@ -427,10 +449,27 @@ const useMusicPlayer = ({
 
   const handlePlaybackStart = () => {
     isActuallyPlayingRef.current = true;
+    hostPlayingRef.current = false;
+  };
+
+  const handleBufferEnd = () => {
+    if (user?.isHost && isPlaying) {
+      hostPlayingRef.current = true;
+    }
+  };
+
+  const handlePlayerPlay = () => {
+    isActuallyPlayingRef.current = true;
+    if (user?.isHost) {
+      hostPlayingRef.current = true;
+      hostHasPlayedRef.current = true;
+      sendHostState('play');
+    }
   };
 
   const handlePlaybackPause = () => {
     isActuallyPlayingRef.current = false;
+    hostPlayingRef.current = false;
     // Browsers may pause muted autoplay on their own (e.g. power saving)
     if (isMuted && isPlaying) {
       fallbackToPendingSync('paused by browser');
@@ -464,6 +503,8 @@ const useMusicPlayer = ({
     handleReady,
     handleError,
     handlePlaybackStart,
+    handleBufferEnd,
+    handlePlayerPlay,
     handlePlaybackPause,
     handleEnded,
     handleDuration,
