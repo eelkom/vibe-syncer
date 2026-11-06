@@ -79,6 +79,8 @@ const MusicRoom = () => {
     handleReady,
     handleError,
     handlePlaybackStart,
+    handleBufferEnd,
+    handlePlayerPlay,
     handlePlaybackPause,
     handleEnded,
     handleDuration,
@@ -87,6 +89,7 @@ const MusicRoom = () => {
     roomCode: roomCode || '',
     sendMessage,
     subscribe,
+    connectionStatus,
     user,
     currentSong,
     onSongEnded: () => {
@@ -150,8 +153,9 @@ const MusicRoom = () => {
                 width="100%"
                 height="100%"
                 onReady={handleReady}
-                onPlay={handlePlaybackStart}
+                onPlay={handlePlayerPlay}
                 onBuffer={handlePlaybackStart}
+                onBufferEnd={handleBufferEnd}
                 onPause={handlePlaybackPause}
                 onDuration={handleDuration}
                 onProgress={handleProgress}

@@ -7,6 +7,7 @@ export const SyncSocketMessageSchema = z.object({
   timestamp: z.number().optional(),
   videoId: z.string().optional(),
   user_id: z.number().int().optional(),
+  snapshot: z.boolean().optional(),
 });
 
 export const ChatSocketMessageSchema = ChatMessageSchema.extend({
