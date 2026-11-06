@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import ChatBoard from './components/ChatBoard';
 import QueueBoard from './components/QueueBoard';
 import { useUser } from '@/contexts/UserContext';
@@ -30,19 +30,35 @@ const MusicRoom = () => {
   } = useQueueList(roomCode || '');
 
   const queryClient = useQueryClient();
-  const { sendMessage, subscribe, connectionStatus } = useWebSocket(
-    roomCode || '',
-  );
+  const {
+    sendMessage,
+    subscribe,
+    connectionStatus,
+    reconnectCount,
+    isReconnectExhausted,
+    reconnect,
+  } = useWebSocket(roomCode || '');
+
+  const refreshQueueList = useCallback(async () => {
+    const queryKey = ['queueList', roomCode];
+    // Without data yet, invalidate alone reuses the in-flight first fetch and
+    // its response predates this update, so cancel that fetch first.
+    await queryClient.cancelQueries({ queryKey });
+    await queryClient.invalidateQueries({ queryKey });
+  }, [queryClient, roomCode]);
 
   useEffect(() => {
-    return subscribe('queue_update', async () => {
-      const queryKey = ['queueList', roomCode];
-      // Without data yet, invalidate alone reuses the in-flight first fetch and
-      // its response predates this update, so cancel that fetch first.
-      await queryClient.cancelQueries({ queryKey });
-      await queryClient.invalidateQueries({ queryKey });
+    return subscribe('queue_update', refreshQueueList);
+  }, [subscribe, refreshQueueList]);
+
+  useEffect(() => {
+    if (reconnectCount === 0) return;
+
+    void refreshQueueList();
+    void queryClient.invalidateQueries({
+      queryKey: ['chatMessages', roomCode],
     });
-  }, [subscribe, queryClient, roomCode]);
+  }, [reconnectCount, refreshQueueList, queryClient, roomCode]);
 
   const {
     currentSong,
@@ -194,6 +210,8 @@ const MusicRoom = () => {
             sendMessage={sendMessage}
             subscribe={subscribe}
             connectionStatus={connectionStatus}
+            isReconnectExhausted={isReconnectExhausted}
+            onReconnect={reconnect}
           />
         </ErrorBoundary>
       </div>

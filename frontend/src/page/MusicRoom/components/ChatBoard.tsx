@@ -15,6 +15,8 @@ interface ChatBoardProps {
   sendMessage: (messageData: object) => void;
   subscribe: SubscribeSocket;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
+  isReconnectExhausted: boolean;
+  onReconnect: () => void;
 }
 
 const ChatBoard = ({
@@ -23,6 +25,8 @@ const ChatBoard = ({
   sendMessage,
   subscribe,
   connectionStatus,
+  isReconnectExhausted,
+  onReconnect,
 }: ChatBoardProps) => {
   const userId = currentUser?.userId;
   const { data: chatMessages, isLoading, isError } = useChatMessages(roomCode);
@@ -48,11 +52,22 @@ const ChatBoard = ({
       <div className="border-b border-gray-100 p-6">
         <h2 className="text-sm uppercase tracking-wide text-gray-900">Chat</h2>
         {connectionStatus !== 'connected' && (
-          <span className="text-xs text-yellow-600">
-            {connectionStatus === 'connecting' && 'Connecting...'}
-            {connectionStatus === 'disconnected' && 'Disconnected'}
-            {connectionStatus === 'error' && 'Connection error'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-yellow-600">
+              {connectionStatus === 'connecting' && 'Connecting...'}
+              {connectionStatus === 'disconnected' && 'Disconnected'}
+              {connectionStatus === 'error' && 'Connection error'}
+            </span>
+            {isReconnectExhausted && (
+              <button
+                type="button"
+                onClick={onReconnect}
+                className="rounded-full border border-gray-200 px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                다시 연결
+              </button>
+            )}
+          </div>
         )}
       </div>
 

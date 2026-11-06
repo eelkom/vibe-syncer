@@ -57,8 +57,11 @@ const useWebSocket = (roomCode: string) => {
   });
   const [connectionStatus, setConnectionStatus] =
     useState<WebSocketConnectionStatus>('disconnected');
+  const [reconnectCount, setReconnectCount] = useState(0);
+  const [isReconnectExhausted, setIsReconnectExhausted] = useState(false);
 
   const reconnectRef = useRef(0);
+  const connectWebSocketRef = useRef<(() => void) | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
   const isManualCloseRef = useRef(false);
@@ -85,6 +88,17 @@ const useWebSocket = (roomCode: string) => {
 
   const user = JSON.parse(sessionStorage.getItem('user') || 'null');
   const token = user?.token;
+  const [connectionIdentity, setConnectionIdentity] = useState({ roomCode, token });
+
+  // Reset before effects so a new room or token cannot trigger recovery fetches.
+  if (
+    connectionIdentity.roomCode !== roomCode ||
+    connectionIdentity.token !== token
+  ) {
+    setConnectionIdentity({ roomCode, token });
+    setReconnectCount(0);
+    setIsReconnectExhausted(false);
+  }
 
   useEffect(() => {
     if (!roomCode) return;
@@ -93,6 +107,7 @@ const useWebSocket = (roomCode: string) => {
     isMountedRef.current = true;
     isManualCloseRef.current = false;
     reconnectRef.current = 0;
+    let hasOpened = false;
 
     const connectWebSocket = () => {
       if (!isComponentMounted || !isMountedRef.current) return;
@@ -103,6 +118,7 @@ const useWebSocket = (roomCode: string) => {
       socketRef.current = ws;
 
       ws.onopen = () => {
+        if (ws !== socketRef.current) return;
         if (!isComponentMounted || !isMountedRef.current) {
           ws.close();
           return;
@@ -110,6 +126,12 @@ const useWebSocket = (roomCode: string) => {
         logger.log('[WS] Connected');
         setConnectionStatus('connected');
         reconnectRef.current = 0;
+        setIsReconnectExhausted(false);
+        if (hasOpened) {
+          setReconnectCount((count) => count + 1);
+        } else {
+          hasOpened = true;
+        }
       };
 
       const dispatch = <T extends SocketMessageType>(
@@ -126,6 +148,7 @@ const useWebSocket = (roomCode: string) => {
       };
 
       ws.onmessage = (event) => {
+        if (ws !== socketRef.current) return;
         if (!isComponentMounted || !isMountedRef.current) return;
 
         let data: unknown;
@@ -160,6 +183,7 @@ const useWebSocket = (roomCode: string) => {
       };
 
       ws.onerror = (event) => {
+        if (ws !== socketRef.current) return;
         if (!isComponentMounted || !isMountedRef.current) return;
         if (event.type === 'error' && !isComponentMounted) return;
         logger.error('[WS] Error:', event);
@@ -167,6 +191,7 @@ const useWebSocket = (roomCode: string) => {
       };
 
       ws.onclose = () => {
+        if (ws !== socketRef.current) return;
         if (!isComponentMounted || !isMountedRef.current) return;
         logger.log('[WS] Closed');
         setConnectionStatus('disconnected');
@@ -189,16 +214,19 @@ const useWebSocket = (roomCode: string) => {
           }, delay);
         } else {
           logger.log('[WS] Max reconnection attempts reached');
+          setIsReconnectExhausted(true);
         }
       };
     };
 
+    connectWebSocketRef.current = connectWebSocket;
     connectWebSocket();
 
     return () => {
       logger.log('[WS] Cleanup: Component unmounting');
       isComponentMounted = false;
       isMountedRef.current = false;
+      connectWebSocketRef.current = null;
 
       clearReconnectTimer();
 
@@ -215,8 +243,18 @@ const useWebSocket = (roomCode: string) => {
   /** Close the connection on purpose; no reconnect is scheduled afterwards. */
   const disconnect = () => {
     isManualCloseRef.current = true;
+    setIsReconnectExhausted(false);
     clearReconnectTimer();
     socketRef.current?.close();
+  };
+
+  const reconnect = () => {
+    reconnectRef.current = 0;
+    isManualCloseRef.current = false;
+    setIsReconnectExhausted(false);
+    clearReconnectTimer();
+    socketRef.current?.close();
+    connectWebSocketRef.current?.();
   };
 
   const sendMessage = (data: object) => {
@@ -232,6 +270,9 @@ const useWebSocket = (roomCode: string) => {
     disconnect,
     subscribe,
     connectionStatus,
+    reconnectCount,
+    isReconnectExhausted,
+    reconnect,
   };
 };
 
