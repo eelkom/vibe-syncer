@@ -14,6 +14,8 @@ from app.utils import search_youtube_video, executor
 # [Fix] Configure Logger
 logger = logging.getLogger(__name__)
 AI_MODEL = 'gemini-3.8-flash'
+WELCOME_FALLBACK_TEMPLATE = "Hello {username}! Welcome to our music trip! 🎧"
+DJ_FAILURE_MESSAGE = "🤖 Sorry, I'm having trouble right now. Please try again later."
 
 load_dotenv()
 
@@ -208,7 +210,7 @@ async def get_ai_dj_response(user_message: str, user_name: str, chat_history: li
         # [Fix] Improved Error Logging (Mentor Feedback)
         # exc_info=True includes the full stack trace in the logs
         logger.error(f"AI DJ Error: {e}", exc_info=True)
-        return "🤖 Sorry, I'm having trouble right now. Please try again later."
+        return DJ_FAILURE_MESSAGE
 
 
 async def get_ai_welcome_message(username: str) -> str:
@@ -216,7 +218,7 @@ async def get_ai_welcome_message(username: str) -> str:
     Generates a welcome message when a new user enters.
     """
     if not client:
-        return f"Hello {username}! Welcome to our music trip! 🎧"
+        return WELCOME_FALLBACK_TEMPLATE.format(username=username)
 
     prompt = f"""
     [Role]
@@ -246,4 +248,4 @@ async def get_ai_welcome_message(username: str) -> str:
         return response.text.strip()
     except Exception as e:
         logger.error(f"AI Welcome Error: {e}")
-        return f"Hello {username}! Welcome to our music trip! 🎧"
+        return WELCOME_FALLBACK_TEMPLATE.format(username=username)

@@ -18,7 +18,12 @@ from sqlalchemy.orm import Session
 # Import dependencies
 from app import database
 from app.models import models
-from app.ai import get_ai_dj_response, get_ai_welcome_message
+from app.ai import (
+    DJ_FAILURE_MESSAGE,
+    WELCOME_FALLBACK_TEMPLATE,
+    get_ai_dj_response,
+    get_ai_welcome_message,
+)
 from app.utils import process_music_addition
 from app.core.websocket_manager import manager
 from app.auth import SECRET_KEY, ALGORITHM
@@ -34,8 +39,134 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------
 # Rate Limiting Setup (Prevent Spam)
 user_last_dj_request = TTLCache(maxsize=10000, ttl=3600)
+welcomed_users = TTLCache(maxsize=10000, ttl=3600)
+background_tasks = set()
 DJ_COOLDOWN_SECONDS = 10
+WELCOME_TIMEOUT_SECONDS = 8
+DJ_TIMEOUT_SECONDS = 30
 BOT_USER_ID = 0
+
+
+async def send_welcome_message(room_id: int, username: str):
+    db = database.SessionLocal()
+    try:
+        try:
+            welcome_msg = await asyncio.wait_for(
+                get_ai_welcome_message(username), timeout=WELCOME_TIMEOUT_SECONDS
+            )
+        except Exception:
+            logger.exception(f"AI welcome failed for {username} in room {room_id}")
+            welcome_msg = WELCOME_FALLBACK_TEMPLATE.format(username=username)
+
+        ai_chat_entry = models.ChatMessage(
+            room_id=room_id,
+            user_id=BOT_USER_ID,
+            message=f"[VibeBot] {welcome_msg}"
+        )
+        db.add(ai_chat_entry)
+        db.commit()
+        db.refresh(ai_chat_entry)
+
+        await manager.broadcast_to_room(room_id, {
+            "type": "chat",
+            "id": ai_chat_entry.id,
+            "room_id": room_id,
+            "user_id": BOT_USER_ID,
+            "username": "🤖 VibeBot",
+            "message": welcome_msg,
+            "created_at": ai_chat_entry.created_at.isoformat()
+        })
+
+        logger.info(f"AI Welcome message sent to {username} in room {room_id}")
+    except Exception:
+        logger.exception(f"Failed to send AI welcome message in room {room_id}")
+    finally:
+        db.close()
+
+
+async def process_chat_actions(
+    room_id: int, user_id: int, username: str, dj_query: str, found_urls: List[str]
+):
+    db = database.SessionLocal()
+    try:
+        if dj_query:
+            await manager.broadcast_to_room(room_id, {
+                "type": "system", "message": "🤖 DJ VibeBot is thinking..."
+            })
+
+            recent_chats_db = db.query(models.ChatMessage, models.User.username) \
+                .join(models.User, models.ChatMessage.user_id == models.User.id) \
+                .filter(models.ChatMessage.room_id == room_id) \
+                .order_by(desc(models.ChatMessage.created_at)) \
+                .limit(5) \
+                .all()
+
+            chat_history = [{"username": c.username, "message": c.ChatMessage.message}
+                            for c in recent_chats_db[::-1]]
+
+            queue_db = db.query(models.QueueItem) \
+                .filter(models.QueueItem.room_id == room_id, models.QueueItem.is_played == False) \
+                .order_by(models.QueueItem.created_at.asc()) \
+                .limit(5) \
+                .all()
+
+            current_queue_context = [{"title": q.title, "artist": q.artist} for q in queue_db]
+            db.rollback()
+            try:
+                ai_reply = await asyncio.wait_for(
+                    get_ai_dj_response(dj_query, username, chat_history, current_queue_context),
+                    timeout=DJ_TIMEOUT_SECONDS
+                )
+            except Exception:
+                logger.exception(f"AI DJ failed for user {user_id} in room {room_id}")
+                ai_reply = DJ_FAILURE_MESSAGE
+
+            ai_chat_entry = models.ChatMessage(
+                room_id=room_id,
+                user_id=BOT_USER_ID,
+                message=f"[VibeBot] {ai_reply}"
+            )
+            db.add(ai_chat_entry)
+            db.commit()
+            db.refresh(ai_chat_entry)
+
+            await manager.broadcast_to_room(room_id, {
+                "type": "chat",
+                "id": ai_chat_entry.id,
+                "room_id": room_id,
+                "user_id": BOT_USER_ID,
+                "username": "🤖 VibeBot",
+                "message": ai_reply,
+                "created_at": ai_chat_entry.created_at.isoformat()
+            })
+
+        for url in found_urls:
+            added_item = await process_music_addition(
+                room_id=room_id,
+                user_id=user_id,
+                music_url=url,
+                db=db,
+                title=f"Shared by {username}",
+                artist="Unknown"
+            )
+            if added_item:
+                await manager.broadcast_to_room(room_id, {
+                    "type": "queue_update",
+                    "user_id": user_id,
+                    "title": added_item.title,
+                    "artist": added_item.artist,
+                    "thumbnail_url": added_item.thumbnail_url,
+                    "music_url": added_item.music_url,
+                    "platform": added_item.platform
+                })
+                await manager.broadcast_to_room(room_id, {
+                    "type": "system",
+                    "message": f"🎵 '{added_item.title}' has been added to the queue!"
+                })
+    except Exception:
+        logger.exception(f"Chat actions failed for user {user_id} in room {room_id}")
+    finally:
+        db.close()
 
 
 # ---------------------------------------------------------
@@ -99,41 +230,20 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
         # 4. Fetch User Info
         user = db.query(models.User).filter(models.User.id == user_id).first()
         username = user.username if user else f"Unknown({user_id})"
+        # Return the connection to the pool before waiting or starting background work.
+        db.rollback()
 
         # 5. Broadcast Join
-        await manager.broadcast_to_room(room_id, {
-            "type": "system",
-            "message": f"{username} has joined the room."
-        })
-
-        try:
-            welcome_msg = await get_ai_welcome_message(username)
-
-            ai_chat_entry = models.ChatMessage(
-                room_id=room_id,
-                user_id=BOT_USER_ID,
-                message=f"[VibeBot] {welcome_msg}"
-            )
-            db.add(ai_chat_entry)
-            db.commit()
-            db.refresh(ai_chat_entry)
-
+        welcome_key = (room_id, user_id)
+        if welcome_key not in welcomed_users:
+            welcomed_users[welcome_key] = True
             await manager.broadcast_to_room(room_id, {
-                "type": "chat",
-                "id": ai_chat_entry.id,
-                "room_id": room_id,
-                "user_id": BOT_USER_ID,
-                "username": "🤖 VibeBot",
-                "message": welcome_msg,
-                "created_at": ai_chat_entry.created_at.isoformat()
+                "type": "system",
+                "message": f"{username} has joined the room."
             })
-
-            logger.info(f"AI Welcome message sent to {username} in room {room_id}")
-
-        except Exception as e:
-            logger.error(f"Failed to send AI welcome message: {e}")
-            pass
-        # ==========================================================
+            task = asyncio.create_task(send_welcome_message(room_id, username))
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
 
         # Regex for URL detection
         url_pattern = re.compile(r'(https?://\S+)')
@@ -202,7 +312,9 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                     "message": chat_message,
                     "created_at": new_chat.created_at.isoformat()
                 })
+                db.rollback()
 
+                dj_query = ""
                 # AI Trigger (!dj)
                 if chat_message.lower().startswith("!dj"):
                     user_key = f"{room_id}:{user_id}"
@@ -217,82 +329,16 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                         continue
 
                     user_last_dj_request[user_key] = datetime.now()
-                    query = chat_message[3:].strip()
-
-                    if query:
-                        # Notify users that AI is thinking
-                        await manager.broadcast_to_room(room_id,
-                                                        {"type": "system", "message": "🤖 DJ VibeBot is thinking..."})
-
-                        # Fetch recent chat context
-                        recent_chats_db = db.query(models.ChatMessage, models.User.username) \
-                            .join(models.User, models.ChatMessage.user_id == models.User.id) \
-                            .filter(models.ChatMessage.room_id == room_id) \
-                            .order_by(desc(models.ChatMessage.created_at)) \
-                            .limit(5) \
-                            .all()
-
-                        chat_history = [{"username": c.username, "message": c.ChatMessage.message}
-                                        for c in recent_chats_db[::-1]]
-
-                        # [ADD] Import Queue Context
-                        # Check songs that have not yet been played (is_played=False)
-                        queue_db = db.query(models.QueueItem) \
-                            .filter(models.QueueItem.room_id == room_id, models.QueueItem.is_played == False) \
-                            .order_by(models.QueueItem.created_at.asc()) \
-                            .limit(5) \
-                            .all()
-
-                        current_queue_context = [{"title": q.title, "artist": q.artist} for q in queue_db]
-                        # Get AI Response
-                        ai_reply = await get_ai_dj_response(query, username, chat_history, current_queue_context)
-
-                        # Save AI Response
-                        ai_chat_entry = models.ChatMessage(
-                            room_id=room_id,
-                            user_id=BOT_USER_ID,
-                            message=f"[VibeBot] {ai_reply}"
-                        )
-                        db.add(ai_chat_entry)
-                        db.commit()
-                        db.refresh(ai_chat_entry)
-
-                        # Broadcast AI Response
-                        await manager.broadcast_to_room(room_id, {
-                            "type": "chat",
-                            "id": ai_chat_entry.id,
-                            "room_id": room_id,
-                            "user_id": BOT_USER_ID,
-                            "username": "🤖 VibeBot",
-                            "message": ai_reply,
-                            "created_at": ai_chat_entry.created_at.isoformat()
-                        })
+                    dj_query = chat_message[3:].strip()
 
                 # URL Detection & Auto-Add to Queue
                 found_urls = url_pattern.findall(chat_message)
-                for url in found_urls:
-                    added_item = await process_music_addition(
-                        room_id=room_id,
-                        user_id=user_id,
-                        music_url=url,
-                        db=db,
-                        title=f"Shared by {username}",
-                        artist="Unknown"
-                    )
-                    if added_item:
-                        await manager.broadcast_to_room(room_id, {
-                            "type": "queue_update",
-                            "user_id": user_id,
-                            "title": added_item.title,
-                            "artist": added_item.artist,
-                            "thumbnail_url": added_item.thumbnail_url,
-                            "music_url": added_item.music_url,
-                            "platform": added_item.platform
-                        })
-                        await manager.broadcast_to_room(room_id, {
-                            "type": "system",
-                            "message": f"🎵 '{added_item.title}' has been added to the queue!"
-                        })
+                if dj_query or found_urls:
+                    task = asyncio.create_task(process_chat_actions(
+                        room_id, user_id, username, dj_query, found_urls
+                    ))
+                    background_tasks.add(task)
+                    task.add_done_callback(background_tasks.discard)
 
         except WebSocketDisconnect:
             manager.disconnect(websocket, room_id)
