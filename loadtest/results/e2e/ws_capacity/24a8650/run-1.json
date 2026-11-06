@@ -1,0 +1,108 @@
+{
+  "scenario": "ws_capacity",
+  "condition": "default",
+  "commit": "24a8650",
+  "commit_full": "24a86502e6b3a751aa6d1c17f9ce409427e6b827",
+  "run": 1,
+  "started_at": "2026-11-06T11:50:27.661Z",
+  "ok": true,
+  "passed": false,
+  "metrics": {
+    "passed": false,
+    "connections_tried": 30,
+    "connections_opened": 15,
+    "slowest_open_ms": 15004,
+    "ping_after_ms": 12086,
+    "welcomes_seen_by_first": 15,
+    "rows": [
+      {
+        "index": 1,
+        "opened": true,
+        "open_ms": 8
+      },
+      {
+        "index": 2,
+        "opened": true,
+        "open_ms": 7
+      },
+      {
+        "index": 3,
+        "opened": true,
+        "open_ms": 5
+      },
+      {
+        "index": 4,
+        "opened": true,
+        "open_ms": 8
+      },
+      {
+        "index": 5,
+        "opened": true,
+        "open_ms": 5
+      },
+      {
+        "index": 6,
+        "opened": true,
+        "open_ms": 5
+      },
+      {
+        "index": 7,
+        "opened": true,
+        "open_ms": 7
+      },
+      {
+        "index": 8,
+        "opened": true,
+        "open_ms": 5
+      },
+      {
+        "index": 9,
+        "opened": true,
+        "open_ms": 6
+      },
+      {
+        "index": 10,
+        "opened": true,
+        "open_ms": 8
+      },
+      {
+        "index": 11,
+        "opened": true,
+        "open_ms": 6
+      },
+      {
+        "index": 12,
+        "opened": true,
+        "open_ms": 5
+      },
+      {
+        "index": 13,
+        "opened": true,
+        "open_ms": 9
+      },
+      {
+        "index": 14,
+        "opened": true,
+        "open_ms": 5
+      },
+      {
+        "index": 15,
+        "opened": true,
+        "open_ms": 6
+      },
+      {
+        "index": 16,
+        "opened": false,
+        "open_ms": 15004,
+        "error": "Timeout: Node WS open"
+      }
+    ]
+  },
+  "blocked_external_requests": 0,
+  "errors": [],
+  "server_logs": [
+    ".logs/server-loadtest_e2e_ws_capacity_24a8650_1-69461.log"
+  ],
+  "server_forced_kills": 0,
+  "finished_at": "2026-11-06T11:51:00.794Z"
+}
