@@ -36,17 +36,24 @@ export async function launch(cleanup, activation = false, { allowHosts } = {}) {
   cleanup.push(() => browser.close());
   return browser;
 }
-export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed', captureArtifacts = true, { youtube = false } = {}) {
+export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed', captureArtifacts = true, { youtube = false, syncProbe = false } = {}) {
   if (!['muted-allowed', 'all-blocked', 'silent-blocked'].includes(playbackCondition)) throw new Error(`Unknown playback condition: ${playbackCondition}`);
   const context = await browser.newContext({ serviceWorkers: 'block' });
   cleanup.push(() => context.close());
-  await context.addInitScript(({ user, playbackCondition, youtube }) => {
+  await context.addInitScript(({ user, playbackCondition, youtube, syncProbe }) => {
     if (youtube && window.top !== window) {
       // Never write app credentials or instrument app controls in an iframe.
       const hostname = window.location.hostname;
       if ((hostname === 'youtube.com' || hostname.endsWith('.youtube.com')
         || hostname === 'youtube-nocookie.com' || hostname.endsWith('.youtube-nocookie.com'))
         && window.location.pathname.startsWith('/embed/')) {
+        let seekedCount = 0;
+        if (syncProbe) document.addEventListener('seeked', event => {
+          if (event.target?.tagName === 'VIDEO') {
+            seekedCount++;
+            console.debug('__sync_seeked ' + JSON.stringify({ t: Date.now(), ct: event.target.currentTime }));
+          }
+        }, true);
         setInterval(() => {
           const el = document.querySelector('video');
           const player = document.querySelector('.html5-video-player');
@@ -56,6 +63,7 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
             buffering: !!document.querySelector('.html5-video-player.buffering-mode') || el.readyState < 3,
             player_state: [...(player?.classList ?? [])].find(name => /^(playing|paused|buffering|unstarted|ended)-mode$/.test(name)) ?? null }
             : { t: Date.now(), none: true };
+          if (syncProbe) { sample.seeked_count = seekedCount; sample.media_url = window.location.href; }
           console.debug('__yt_sample ' + JSON.stringify(sample));
         }, 100);
       }
@@ -69,14 +77,24 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     window.__lastPlaybackClickAt = null;
     window.__blockedPlay = 0;
     window.__wsLog = [];
+    window.__wsBlocked = false;
+    window.__wsLast = null;
+    const probeDocument = syncProbe ? `${Date.now()}-${Math.random()}` : null;
+    const reportSocket = (record, index) => {
+      if (syncProbe) console.debug('__sync_ws ' + JSON.stringify({ document: probeDocument, index, record }));
+    };
     const NativeWebSocket = window.WebSocket;
     window.WebSocket = new Proxy(NativeWebSocket, {
       construct(target, args, newTarget) {
         const record = { created_at: Date.now(), open_at: null, close_at: null, code: null };
         window.__wsLog.push(record);
-        const socket = Reflect.construct(target, args, newTarget);
-        socket.addEventListener('open', () => { record.open_at = Date.now(); });
-        socket.addEventListener('close', event => { record.close_at = Date.now(); record.code = event.code; });
+        const index = window.__wsLog.length - 1;
+        reportSocket(record, index);
+        const effectiveArgs = window.__wsBlocked ? ['ws://127.0.0.1:1/', ...args.slice(1)] : args;
+        const socket = Reflect.construct(target, effectiveArgs, newTarget);
+        window.__wsLast = socket;
+        socket.addEventListener('open', () => { record.open_at = Date.now(); reportSocket(record, index); });
+        socket.addEventListener('close', event => { record.close_at = Date.now(); record.code = event.code; reportSocket(record, index); });
         return socket;
       },
     });
@@ -111,11 +129,24 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
       if (kind && event.isTrusted) window.__userClickEvents.push({ kind, t: Date.now() });
       if (button?.classList.contains('h-14') && event.isTrusted) window.__lastPlaybackClickAt = Date.now();
     }, true);
+    let seekedCount = 0;
+    if (syncProbe) document.addEventListener('seeked', event => {
+      if (event.target?.matches?.('audio,video')) {
+        seekedCount++;
+        console.debug('__sync_seeked ' + JSON.stringify({ t: Date.now(), ct: event.target.currentTime }));
+      }
+    }, true);
     setInterval(() => {
       const el = document.querySelector('audio,video');
-      window.__samples.push(el ? { t: Date.now(), ct: el.currentTime, paused: el.paused,
+      const sample = el ? { t: Date.now(), ct: el.currentTime, paused: el.paused,
         muted: el.muted, volume: el.volume, act: navigator.userActivation.hasBeenActive }
-        : { t: Date.now(), none: true, act: navigator.userActivation.hasBeenActive });
+        : { t: Date.now(), none: true, act: navigator.userActivation.hasBeenActive };
+      if (syncProbe) {
+        sample.src = el ? el.currentSrc || el.src : null;
+        sample.seeked_count = seekedCount;
+        console.debug('__sync_sample ' + JSON.stringify(sample));
+      }
+      window.__samples.push(sample);
     }, 100);
     if (playbackCondition !== 'muted-allowed') {
       const play = HTMLMediaElement.prototype.play;
@@ -150,9 +181,10 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
         },
       });
     }
-  }, { user, playbackCondition, youtube });
+  }, { user, playbackCondition, youtube, syncProbe });
   const page = await context.newPage();
   const state = { page, frames: [], sent: [], attempts: [], consoleErrors: [], responses: [], clicks: [], reconciledClicks: 0 };
+  if (syncProbe) Object.assign(state, { probeSamples: [], probeWsLog: [], seeked: [] });
   if (youtube) {
     state.ytSamples = [];
     result.external_hosts ??= {};
@@ -176,6 +208,17 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     }
   });
   page.on('console', msg => {
+    if (syncProbe) for (const [prefix, key] of [['__sync_sample ', 'probeSamples'], ['__sync_seeked ', 'seeked'], ['__sync_ws ', 'probeWsLog']]) {
+      if (!msg.text().startsWith(prefix)) continue;
+      try {
+        const value = JSON.parse(msg.text().slice(prefix.length));
+        if (key === 'probeWsLog') {
+          const previous = state.probeWsLog.find(row => row.document === value.document && row.index === value.index);
+          if (previous) Object.assign(previous.record, value.record); else state.probeWsLog.push(value);
+        } else state[key].push(value);
+      } catch (error) { result.errors.push(`sync probe: ${error.message}`); }
+      return;
+    }
     if (youtube && msg.text().startsWith('__yt_sample ')) {
       try { state.ytSamples.push(JSON.parse(msg.text().slice('__yt_sample '.length))); }
       catch (error) { result.errors.push(`YouTube sample: ${error.message}`); }
@@ -297,13 +340,13 @@ export async function readyHost(state, room, alreadyEntered = false) {
   state.lastPlayClickAt = await state.page.evaluate(() => window.__lastPlaybackClickAt);
   await until(() => state.sent.some(f => f.t >= since && f.data.type === 'sync' && f.data.action === 'play'), 5000, 'host play sync frame');
 }
-export async function readyHostYouTube(state, room, front = FRONT) {
+export async function readyHostYouTube(state, room, front = FRONT, { playbackTimeout = 60000 } = {}) {
   await enter(state, room, front);
   try {
     await until(() => {
       const s = state.ytSamples.at(-1);
       return s && !s.none && !s.paused && s.ct >= 0.2 && !s.ad;
-    }, 60000, 'host YouTube playback');
+    }, playbackTimeout, 'host YouTube playback');
   } catch (error) {
     throw new Error(`${error.message}; last YouTube samples: ${JSON.stringify(state.ytSamples.slice(-10))}; blocked_hosts: ${JSON.stringify(state.blockedHosts)}`);
   }
@@ -332,4 +375,17 @@ export async function settleChat(state) {
     new MutationObserver(() => { window.__chatChangedAt = Date.now(); }).observe(el, { childList: true, subtree: true, characterData: true });
   });
   await until(() => state.page.evaluate(() => Date.now() - window.__chatChangedAt >= 3000), 30000, 'chat DOM quiet for 3s');
+}
+
+// Fault injection is opt-in. Normal sockets retain their native URL and behavior.
+export async function dropSocket(state) {
+  return state.page.evaluate(() => {
+    window.__wsBlocked = true;
+    const t = Date.now();
+    window.__wsLast?.close();
+    return t;
+  });
+}
+export async function restoreSocket(state) {
+  return state.page.evaluate(() => { window.__wsBlocked = false; return Date.now(); });
 }

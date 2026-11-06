@@ -3,7 +3,7 @@ import { mkdir, open, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import net from 'node:net';
 import { ROOT, API, until, deadline } from './common.mjs';
-export function serverArgs(sha, database, measurementPoolSize = null, instrument = null) {
+export function serverArgs(sha, database, measurementPoolSize = null, instrument = null, slowAiMs = null) {
   const args = [path.join(ROOT, 'server/run_server.py'),
     path.join(ROOT, '.baselines', sha, 'backend'), '18000', '--database-url',
     `postgresql://vibe@127.0.0.1:55432/${database}`];
@@ -14,6 +14,10 @@ export function serverArgs(sha, database, measurementPoolSize = null, instrument
     args.push('--measurement-pool-size', String(measurementPoolSize));
   }
   if (instrument !== null) args.push('--instrument', instrument);
+  if (slowAiMs !== null) {
+    if (!Number.isInteger(slowAiMs) || slowAiMs < 0) throw new Error('slowAiMs must be a nonnegative integer');
+    args.push('--slow-ai-ms', String(slowAiMs));
+  }
   return args;
 }
 export async function stopProcess(child, exited) {
@@ -28,14 +32,14 @@ export async function stopProcess(child, exited) {
     return { forced };
   }
 }
-export async function startServer(sha, database, measurementPoolSize = null, instrument = null) {
+export async function startServer(sha, database, measurementPoolSize = null, instrument = null, slowAiMs = null) {
   // Refuse to attach to another process already occupying the measurement port.
   const probe = net.createServer();
   await new Promise((resolve, reject) => { probe.once('error', reject); probe.listen(18000, '127.0.0.1', resolve); });
   await new Promise(resolve => probe.close(resolve));
   await mkdir(path.join(ROOT, '.logs'), { recursive: true });
   const log = await open(path.join(ROOT, '.logs', `launcher-${database}-${Date.now()}.log`), 'a');
-  const child = spawn(path.join(ROOT, '.venv/bin/python'), serverArgs(sha, database, measurementPoolSize, instrument),
+  const child = spawn(path.join(ROOT, '.venv/bin/python'), serverArgs(sha, database, measurementPoolSize, instrument, slowAiMs),
     { cwd: ROOT, stdio: ['ignore', log.fd, log.fd] });
   const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
   let spawnError;

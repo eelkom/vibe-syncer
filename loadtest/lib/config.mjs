@@ -1,3 +1,4 @@
+import { SYNC_CONDITIONS } from './sync-plan.mjs';
 import { validateCommit } from './commit.mjs';
 export const MAIN = 'b86324b';
 export const COMPARISONS = {
@@ -16,19 +17,24 @@ export function parseArgs(args) {
     else if (key === '--commit') opts.commit = validateCommit(args[++i]);
     else throw new Error(`Unknown argument: ${key}`);
   }
-  if (![...Object.keys(COMPARISONS), 'all', 'reconnect', 'late_join_youtube'].includes(opts.scenario)) throw new Error('Unknown scenario');
+  if (![...Object.keys(COMPARISONS), 'all', 'reconnect', 'late_join_youtube', ...Object.keys(SYNC_CONDITIONS)].includes(opts.scenario)) throw new Error('Unknown scenario');
   if (opts.runs !== null && (!Number.isInteger(opts.runs) || opts.runs < 1)) throw new Error('--runs must be a positive integer');
   if (opts.condition !== null && !opts.condition) throw new Error('--condition needs a value');
   if (opts.scenario === 'late_join_youtube' && !opts.commit) throw new Error('late_join_youtube requires --commit');
-  if (opts.commit && !['late_join', 'autoplay', 'late_join_youtube'].includes(opts.scenario)) throw new Error('--commit requires --scenario late_join, autoplay or late_join_youtube');
+  if (SYNC_CONDITIONS[opts.scenario] && !opts.commit) throw new Error(`${opts.scenario} requires --commit`);
+  if (opts.commit && !['late_join', 'autoplay', 'late_join_youtube', ...Object.keys(SYNC_CONDITIONS)].includes(opts.scenario)) throw new Error('--commit requires --scenario late_join, autoplay or late_join_youtube');
   return opts;
 }
 export function plan(opts) {
+  if (SYNC_CONDITIONS[opts.scenario] && !opts.commit) throw new Error(`${opts.scenario} requires --commit`);
   if (opts.scenario === 'late_join_youtube' && !opts.commit) throw new Error('late_join_youtube requires --commit');
   const names = opts.scenario === 'all' ? [...Object.keys(COMPARISONS), 'reconnect'] : [opts.scenario];
   const jobs = [];
   for (const scenario of names) {
-    if (scenario === 'reconnect') {
+    if (SYNC_CONDITIONS[scenario]) {
+      for (const condition of SYNC_CONDITIONS[scenario]) jobs.push({ scenario, sha: opts.commit, serverSha: opts.commit, condition, defaultRuns: 5,
+        ...(scenario === 'server_block' ? { slowAiMs: 10000 } : {}) });
+    } else if (scenario === 'reconnect') {
       jobs.push(
         { scenario, sha: '1b2e6c4', serverSha: MAIN, condition: 'exponential-14', botCount: 14, measurementPoolSize: null, defaultRuns: 5 },
         { scenario, sha: MAIN, serverSha: MAIN, condition: 'full-jitter-14', botCount: 14, measurementPoolSize: null, defaultRuns: 5 },
