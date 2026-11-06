@@ -87,6 +87,10 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
             await websocket.close(code=4004, reason="Invalid Room Code")
             return
 
+        if payload.get("room_id") != room.id:
+            await websocket.close(code=4003, reason="Token is for another room")
+            return
+
         # Extract ID for internal logic
         room_id = room.id
         host_id = room.host_id  # For permission check
