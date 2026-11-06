@@ -76,6 +76,7 @@ const useMusicPlayer = ({
   // Ready state of the currently mounted player (it remounts on every song)
   const isPlayerReadyRef = useRef(false);
   const isActuallyPlayingRef = useRef(false);
+  const isBufferingRef = useRef(false);
   const hostPlayingRef = useRef(false);
   const hostHasPlayedRef = useRef(false);
 
@@ -118,6 +119,7 @@ const useMusicPlayer = ({
   useEffect(() => {
     isPlayerReadyRef.current = false;
     isActuallyPlayingRef.current = false;
+    isBufferingRef.current = false;
     hostPlayingRef.current = false;
     pendingSyncRef.current = null;
     lastSyncRef.current = null;
@@ -263,6 +265,7 @@ const useMusicPlayer = ({
 
         if (
           timestamp !== undefined &&
+          !isBufferingRef.current && // Repeated seeks during buffering restart loading.
           Math.abs(currentPlayerTime - timestamp) >= 2
         ) {
           playerRef.current?.seekTo(timestamp, 'seconds');
@@ -450,10 +453,12 @@ const useMusicPlayer = ({
 
   const handlePlaybackStart = () => {
     isActuallyPlayingRef.current = true;
+    isBufferingRef.current = true;
     hostPlayingRef.current = false;
   };
 
   const handleBufferEnd = () => {
+    isBufferingRef.current = false;
     if (user?.isHost && isPlaying) {
       hostPlayingRef.current = true;
     }
@@ -461,6 +466,7 @@ const useMusicPlayer = ({
 
   const handlePlayerPlay = () => {
     isActuallyPlayingRef.current = true;
+    isBufferingRef.current = false;
     if (user?.isHost) {
       hostPlayingRef.current = true;
       hostHasPlayedRef.current = true;
