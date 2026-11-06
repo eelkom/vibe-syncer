@@ -16,6 +16,7 @@ const AUTOPLAY_TIMEOUT_MS = 2000;
 // A sync for a song that isn't current yet is dropped after this time
 const EARLY_SYNC_MAX_AGE_MS = 10000;
 
+// A guest that drifted 2s or more recovers within one interval (loadtest/RESULTS.md)
 const HOST_SYNC_INTERVAL_MS = 5000;
 
 type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
