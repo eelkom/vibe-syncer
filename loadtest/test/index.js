@@ -11,3 +11,4 @@ import './commit-selection.test.mjs';
 import './youtube.test.mjs';
 import './deployed-late-join.test.mjs';
 import './sync.test.mjs';
+import './join-timeline.test.mjs';

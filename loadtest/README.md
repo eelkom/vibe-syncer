@@ -320,6 +320,7 @@ node loadtest/summarize_sync.mjs > /tmp/vibe-sync-summary.md
 | 시나리오 | 조건 | 동작 |
 |---|---|---|
 | host_no_action | local, youtube | 호스트 실제 재생 확인, 무조작 30초, 게스트 입장 후 25초 |
+| join_timeline | local, youtube | 무조작 재생 확인 후 UI sync 준비, 30초 재생, 실제 입장 모달 제출부터 25초 관찰 |
 | song_change | local-next, local-prev, local-jump, youtube-next | 무조작 10초 후 곡 변경, 목표 곡 재생 후 30초, 게스트 25초. prev는 두 번째 곡에서 10초 뒤 첫 곡으로 복귀 |
 | natural_end | local | 20초 short.webm 자연 종료 후 long.webm 재생, 30초 뒤 게스트 입장, 25초 관찰 |
 | host_reconnect | local-seek, youtube-seek | 준비 sync, 게스트 입장 20초 후 호스트 소켓 차단, UI range로 +60초, 8초 뒤 차단 해제, 실제 open 후 40초 |
@@ -357,3 +358,20 @@ node loadtest/e2e/ws_room_token.mjs --commit 24a8650
 `summarize_sync.mjs`는 새 stage1 및 e2e 원본만 읽어 시나리오, 조건, 커밋별 회차 값과 숫자 지표의 중앙값 및 최소부터 최대까지 범위를 stdout markdown으로 출력한다. 실패 회차의 값과 오류도 표시한다. 실행 오류 회차만 집계에서 제외하며 e2e의 FAIL은 숨기지 않는다. 원본 JSON을 다시 쓰지 않는다. 다른 결과 루트는 첫 번째 인자로 지정할 수 있다.
 
 검증은 `node --test loadtest/test`, 새 JS 파일의 `node --check`, Python 및 shell 문법 확인까지 수행한다. 실제 브라우저에서는 곡 변경 선택자, range onChange에 의한 실제 +60초 이동, YouTube iframe 표본 및 seeked, 재연결 버튼, 포커스 없는 이력 복구, reload 뒤 표본 재시작을 스모크 원본으로 확인한 뒤 본 측정을 실행한다.
+
+### 입장부터 첫 재생까지 시간
+
+```bash
+node loadtest/run_stage1.mjs --scenario join_timeline --condition local --commit <sha> --runs 5
+node loadtest/run_stage1.mjs --scenario join_timeline --condition youtube --commit <sha> --runs 5
+node loadtest/deploy/join_timeline_deployed.mjs --front-commit <sha> --server-commit <sha> --runs 5
+node loadtest/summarize_sync.mjs > /tmp/join-timeline-summary.md
+```
+
+기존 커밋 준비 절차를 먼저 따른다. 조건을 생략하면 local과 youtube를 모두 실행한다. 스모크에서도 준비 sync 후 30초 재생, 게스트 입장 클릭 후 25초 관찰을 유지한다. 게스트 계정과 sessionStorage를 미리 만들지 않고 랜딩 모달에서 입장한다. 실제 Join Room 버튼의 trusted click이 t0이며 소리 켜기는 기존 `scriptedUser`를 쓴다.
+
+`metrics.join_timeline.times`는 t0 기준 ms, `intervals`는 구간 ms와 `queue_blocking_share` 비율이다. 미관측 값은 null이다. `raw.join_timeline`에 epoch ms 원본 시각, 이벤트와 요청을 남기고 기존 표본과 프레임도 보존한다. 응답은 본문 수신 완료, 로컬 ready는 loadedmetadata, YouTube ready는 top window가 받은 YouTube origin의 onReady message다. 계측은 이벤트 수신과 DOM 관찰만 하며 플레이어 명령을 보내지 않는다. 첫 진행은 광고와 seek 점프를 제외한 같은 소스의 연속 재생 표본에서 확인하며 해상도는 약 100ms다. `total_to_sound`는 t0부터 소리 켜기 이후 첫 muted=false 표본까지다.
+
+`prefetch_upper_bound = max(0, queue_response - room_route)`는 곡 정보 없이 플레이어를 만들 수 있는 가장 이른 시점을 방 경로 진입으로 가정한 상한이다. 실제 개선량이 아니며 `queue_blocking_share`의 분모는 `total_to_progress`다. 분모가 없거나 0이면 null이다. 15초부터 25초 위치 오차 p95는 광고를 제외한 별도 지표다. 요약 표는 회차 값과 실행 성공 회차의 중앙값을 표시한다.
+
+배포 실행은 기존 late_join 배포 실행의 FRONT와 API, 깨우기, 3회 준비 요청, 방 생성, 곡 추가와 방 삭제를 재사용한다. YouTube 조건이며 SHA는 배포 검증 없이 기록한다. 결과는 `results/deploy/join_timeline/<front-commit>/run-N.json`, 회차 간 대기는 10초다. 기존 원본은 건너뛰고 실패 원본 보존 후 중단한다. 로컬 결과는 `results/stage1/join_timeline/<sha>/<condition>/run-N.json`이다.

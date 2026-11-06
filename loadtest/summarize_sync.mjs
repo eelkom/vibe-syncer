@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { ROOT } from './lib/common.mjs';
 import { SYNC_CONDITIONS } from './lib/sync-plan.mjs';
 import { median, numeric } from './lib/stats.mjs';
+import { JOIN_INTERVALS } from './lib/join-timeline-stats.mjs';
 
 const E2E = ['reconnect_recovery', 'reconnect_exhausted', 'ws_room_token'];
 export async function readSyncRuns(root = path.join(ROOT, 'results')) {
@@ -30,6 +31,10 @@ export async function readSyncRuns(root = path.join(ROOT, 'results')) {
     const base = path.join(root, 'e2e', scenario);
     for (const commit of await dirs(base)) await read(path.join(base, commit), { scenario, commit, condition: 'default', suite: 'e2e' });
   }
+  const deployed = path.join(root, 'deploy/join_timeline');
+  for (const commit of await dirs(deployed)) await read(path.join(deployed, commit), {
+    scenario: 'join_timeline_deployed', commit, condition: 'youtube', suite: 'deploy',
+  });
   return runs;
 }
 // Flatten small diagnostic structures and arrays into separate table metrics.
@@ -76,6 +81,17 @@ export function syncMarkdown(groups) {
     lines.push(`## ${group.key}`, '', '| 회차 | 실행 | 판정 | 오류 |', '|---|---|---|---|');
     for (const row of group.rows) lines.push(`| ${row.run} | ${row.ok ? 'OK' : 'FAILED'} | ${row.passed === undefined ? '관측' : row.passed ? 'PASS' : 'FAIL'} | ${cell((row.errors ?? []).join('; '))} |`);
     const columns = group.rows.map(r => `run-${r.run}${r.ok ? '' : ' FAILED'}`);
+    if (group.rows.some(r => ['join_timeline', 'join_timeline_deployed'].includes(r.scenario))) {
+      lines.push('', '### 입장부터 첫 재생까지 구간', '',
+        '시간 구간은 ms, queue_blocking_share는 비율이다. 위치 오차 p95는 입장 클릭 후 15초부터 25초 구간이다.', '',
+        `| 구간 | ${columns.join(' | ')} | 중앙값 | 결측(실행 성공) |`,
+        `|---|${columns.map(() => '---').join('|')}|---|---|`);
+      for (const name of JOIN_INTERVALS) {
+        const key = `join_timeline.intervals.${name}`;
+        const stats = group.metrics[key];
+        lines.push(`| ${name} | ${group.rows.map(r => cell(r.values[key])).join(' | ')} | ${cell(stats?.median ?? null)} | ${stats?.missing ?? group.rows.filter(r => r.ok).length} |`);
+      }
+    }
     lines.push('', `| 지표 | ${columns.join(' | ')} | 중앙값 | 범위 | 결측(실행 성공) |`,
       `|---|${columns.map(() => '---').join('|')}|---|---|---|`);
     for (const [name, stats] of Object.entries(group.metrics)) {

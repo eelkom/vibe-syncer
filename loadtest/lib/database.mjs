@@ -23,9 +23,9 @@ export async function guest(room, nickname) {
   return { userId: g.user_id, nickname, isHost: false, token: g.token };
 }
 // Explicit timestamps avoid the transaction-stable now() default tying songs.
-export async function orderedSeed(database, songs) {
+export async function orderedSeed(database, songs, { participants = true } = {}) {
   if (!songs.length) throw new Error('orderedSeed requires at least one song');
-  const data = await seed(database, { queue: false });
+  const data = await seed(database, { queue: false, participants });
   const client = new pg.Client({ ...DB, database });
   await client.connect();
   const queue = [];
@@ -45,12 +45,12 @@ export async function orderedSeed(database, songs) {
   finally { await client.end(); }
   return { ...data, songs, queue };
 }
-export async function seed(database, { queue = true, musicUrl = 'http://127.0.0.1:15174/tone.webm',
+export async function seed(database, { queue = true, participants = true, musicUrl = 'http://127.0.0.1:15174/tone.webm',
   title = 'Stage1 tone', artist = 'Local', platform = 'Local' } = {}) {
   const room = await rest('/rooms/', { name: 'Stage1', host_nickname: 'host' });
   const host = { userId: room.host_id, nickname: 'host', isHost: true, token: room.token };
-  const g = await guest(room, 'observer');
-  const sender = await guest(room, 'sender');
+  const g = participants ? await guest(room, 'observer') : { nickname: 'observer' };
+  const sender = participants ? await guest(room, 'sender') : null;
   if (!queue) return { room, host, guest: g, sender };
   const client = new pg.Client({ ...DB, database });
   await client.connect();

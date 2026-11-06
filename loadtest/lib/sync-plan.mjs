@@ -1,5 +1,6 @@
 import { YOUTUBE_VIDEO, YOUTUBE_SECOND_VIDEO } from './youtube.mjs';
 export const SYNC_CONDITIONS = Object.freeze({
+  join_timeline: ['local', 'youtube'],
   host_no_action: ['local', 'youtube'],
   song_change: ['local-next', 'local-prev', 'local-jump', 'youtube-next'],
   natural_end: ['local'],

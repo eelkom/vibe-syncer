@@ -1,6 +1,7 @@
 import { ROOT, FRONT, sleep, until } from './common.mjs';
 import path from 'node:path';
 import { reconcileClicks } from './stats.mjs';
+import { joinTimelineProbe } from './join-timeline-probe.mjs';
 process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(ROOT, '.pw-browsers');
 const { chromium } = await import('playwright');
 // Every inspected commit's MusicPlayer.tsx: central play/pause = button.h-14;
@@ -36,11 +37,11 @@ export async function launch(cleanup, activation = false, { allowHosts } = {}) {
   cleanup.push(() => browser.close());
   return browser;
 }
-export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed', captureArtifacts = true, { youtube = false, syncProbe = false } = {}) {
+export async function tab(browser, user, result, cleanup, playbackCondition = 'muted-allowed', captureArtifacts = true, { youtube = false, syncProbe = false, seedUser = true, joinTimeline = false } = {}) {
   if (!['muted-allowed', 'all-blocked', 'silent-blocked'].includes(playbackCondition)) throw new Error(`Unknown playback condition: ${playbackCondition}`);
   const context = await browser.newContext({ serviceWorkers: 'block' });
   cleanup.push(() => context.close());
-  await context.addInitScript(({ user, playbackCondition, youtube, syncProbe }) => {
+  await context.addInitScript(({ user, playbackCondition, youtube, syncProbe, seedUser }) => {
     if (youtube && window.top !== window) {
       // Never write app credentials or instrument app controls in an iframe.
       const hostname = window.location.hostname;
@@ -71,7 +72,7 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     }
     // All nine commits: contexts/UserContext.tsx:16-18 and types/user.ts:1-6
     // read this exact shape. Route is /room/:id in routes/routePath.ts:3.
-    sessionStorage.setItem('user', JSON.stringify(user));
+    if (seedUser) sessionStorage.setItem('user', JSON.stringify(user));
     window.__samples = [];
     window.__userClickEvents = [];
     window.__lastPlaybackClickAt = null;
@@ -181,9 +182,11 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
         },
       });
     }
-  }, { user, playbackCondition, youtube, syncProbe });
+  }, { user, playbackCondition, youtube, syncProbe, seedUser });
+  if (joinTimeline) await context.addInitScript(joinTimelineProbe, { youtube });
   const page = await context.newPage();
   const state = { page, frames: [], sent: [], attempts: [], consoleErrors: [], responses: [], clicks: [], reconciledClicks: 0 };
+  if (joinTimeline) Object.assign(state, { timelineEvents: [], requests: [] });
   if (syncProbe) Object.assign(state, { probeSamples: [], probeWsLog: [], seeked: [] });
   if (youtube) {
     state.ytSamples = [];
@@ -201,6 +204,22 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
   page.on('request', request => {
     externalRequest(request.url());
   });
+  if (joinTimeline) {
+    const records = new WeakMap();
+    page.on('request', request => {
+      const record = { url: request.url(), method: request.method(), sent_at: Date.now(), finished_at: null, status: null };
+      records.set(request, record);
+      state.requests.push(record);
+    });
+    page.on('response', response => {
+      const record = records.get(response.request());
+      if (record) record.status = response.status();
+    });
+    page.on('requestfinished', request => {
+      const record = records.get(request);
+      if (record) record.finished_at = Date.now();
+    });
+  }
   if (youtube) page.on('requestfailed', request => {
     if (request.failure()?.errorText === 'net::ERR_NAME_NOT_RESOLVED') {
       const host = new URL(request.url()).hostname;
@@ -208,6 +227,14 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     }
   });
   page.on('console', msg => {
+    if (joinTimeline && msg.text().startsWith('__join_timeline ')) {
+      try {
+        const event = JSON.parse(msg.text().slice('__join_timeline '.length));
+        state.timelineEvents.push(event);
+        if (event.name === 'join_click') state.t0 ??= event.t;
+      } catch (error) { result.errors.push(`join timeline: ${error.message}`); }
+      return;
+    }
     if (syncProbe) for (const [prefix, key] of [['__sync_sample ', 'probeSamples'], ['__sync_seeked ', 'seeked'], ['__sync_ws ', 'probeWsLog']]) {
       if (!msg.text().startsWith(prefix)) continue;
       try {
@@ -253,13 +280,22 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     try { observation = await readObservation(state, result); } catch (error) { result.errors.push(`sample capture: ${error.message}`); }
     result.browser_artifacts.push({ role: user.nickname, ...observation, ...(youtube ? { yt_samples: state.ytSamples } : {}), frames: state.frames,
       sent: state.sent, attempts: (observation.ws_log ?? []).map(entry => entry.created_at), console_errors: state.consoleErrors,
-      responses: state.responses, clicks: state.clicks, t0: state.t0 ?? null });
+      responses: state.responses, clicks: state.clicks, t0: state.t0 ?? null,
+      ...(joinTimeline ? { timeline_events: state.timelineEvents, requests: state.requests } : {}) });
   });
   return state;
 }
 export async function enter(state, room, front = FRONT) {
   state.t0 = Date.now();
   await state.page.goto(`${front}/room/${room.room_code}`, { waitUntil: 'domcontentloaded' });
+}
+export async function joinFromLanding(state, room, nickname, front = FRONT) {
+  await state.page.goto(front, { waitUntil: 'domcontentloaded' });
+  await state.page.getByRole('button', { name: 'Join Existing Room', exact: true }).click();
+  await state.page.locator('#roomCode').fill(room.room_code);
+  await state.page.locator('#nickName').fill(nickname);
+  await state.page.getByRole('button', { name: 'Join Room', exact: true }).click();
+  await until(() => Number.isFinite(state.t0), 5000, 'trusted join click');
 }
 export async function samples(state) { return state.page.evaluate(() => window.__samples ?? []); }
 // Call only after observation ends (or an aborted run reaches cleanup).
@@ -340,8 +376,8 @@ export async function readyHost(state, room, alreadyEntered = false) {
   state.lastPlayClickAt = await state.page.evaluate(() => window.__lastPlaybackClickAt);
   await until(() => state.sent.some(f => f.t >= since && f.data.type === 'sync' && f.data.action === 'play'), 5000, 'host play sync frame');
 }
-export async function readyHostYouTube(state, room, front = FRONT, { playbackTimeout = 60000 } = {}) {
-  await enter(state, room, front);
+export async function readyHostYouTube(state, room, front = FRONT, { playbackTimeout = 60000, alreadyEntered = false } = {}) {
+  if (!alreadyEntered) await enter(state, room, front);
   try {
     await until(() => {
       const s = state.ytSamples.at(-1);

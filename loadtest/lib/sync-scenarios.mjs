@@ -1,8 +1,23 @@
 import { session, waitPlaying, waitOpen, syncFrames, seekForward, delayTo } from './sync-session.mjs';
-import { dropSocket, restoreSocket, selectors } from './browser.mjs';
+import { dropSocket, restoreSocket, selectors, readyHost, readyHostYouTube } from './browser.mjs';
 import { sleep, until } from './common.mjs';
 import { median, percentile } from './stats.mjs';
 import { recoveryTime, windowP95, intervalP95, backwardJumps, staleVideoSyncs, reconnectFrames } from './sync-stats.mjs';
+
+export async function joinTimeline(ctx) {
+  // Start through the same no-action playback wait as host_no_action, then
+  // send the UI sync snapshot before the measured guest arrives.
+  const s = await session(ctx, { joinTimeline: true });
+  if (s.youtube) await readyHostYouTube(s.host, ctx.seed.room, ctx.front, { alreadyEntered: true });
+  else await readyHost(s.host, ctx.seed.room, true);
+  s.metrics.raw.host_last_play_click_at = s.host.lastPlayClickAt;
+  s.metrics.host_playing_at = await waitPlaying(s.host, { since: s.host.lastPlayClickAt, timeout: s.youtube ? 60000 : 20000 });
+  await delayTo(s.metrics.host_playing_at + 30000);
+  await s.join();
+  const end = s.guest.t0 + 25000;
+  await delayTo(end);
+  return s.finish(end);
+}
 
 export async function hostNoAction(ctx) {
   const s = await session(ctx);

@@ -64,7 +64,7 @@ try {
       await createDatabase(database); created = true;
       server = await startServer(serverSha, database, measurementPoolSize, null, job.slowAiMs ?? null);
       result.server_logs = [path.relative(ROOT, server.logPath)];
-      const data = SYNC_CONDITIONS[scenario] ? await orderedSeed(database, syncSongs(scenario, condition))
+      const data = SYNC_CONDITIONS[scenario] ? await orderedSeed(database, syncSongs(scenario, condition), { participants: scenario !== 'join_timeline' })
         : scenario === 'late_join_youtube'
         ? await seed(database, { musicUrl: YOUTUBE_VIDEO.url, title: 'Big Buck Bunny', artist: 'Blender', platform: 'Youtube' })
         : await seed(database);

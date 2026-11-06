@@ -1,8 +1,9 @@
-import { launch, tab, enter, readyHost, readyHostYouTube, scriptedUser, readObservation, YOUTUBE_HOSTS } from './browser.mjs';
+import { launch, tab, enter, joinFromLanding, readyHost, readyHostYouTube, scriptedUser, readObservation, YOUTUBE_HOSTS } from './browser.mjs';
 import { sleep, until } from './common.mjs';
 import { positionErrors, percentile } from './stats.mjs';
 import { windowP95, sourceMatches } from './sync-stats.mjs';
 import { youtubeDiagnostics } from './youtube.mjs';
+import { joinTimelineStats } from './join-timeline-stats.mjs';
 
 export const syncFrames = frames => frames.filter(f => f.data.type === 'sync');
 export const mediaSamples = state => state.youtube ? state.ytSamples : state.probeSamples;
@@ -27,10 +28,10 @@ export async function waitOpen(state, since, timeout = 35000) {
   }
   return opened;
 }
-export async function session(ctx, { prepared = false, beforeGuestEnter = null } = {}) {
+export async function session(ctx, { prepared = false, beforeGuestEnter = null, joinTimeline = false } = {}) {
   const { cleanup, result, seed, condition, smoke } = ctx;
   const youtube = condition.includes('youtube');
-  const allowHosts = youtube ? YOUTUBE_HOSTS : undefined;
+  const allowHosts = youtube || ctx.extraHosts ? [...(youtube ? YOUTUBE_HOSTS : []), ...(ctx.extraHosts ?? [])] : undefined;
   const hostBrowser = await launch(cleanup, false, { allowHosts });
   const guestBrowser = await launch(cleanup, true, { allowHosts });
   const options = { youtube, syncProbe: true };
@@ -43,7 +44,8 @@ export async function session(ctx, { prepared = false, beforeGuestEnter = null }
     host_seeked: host.seeked, host_ws_events: host.probeWsLog, host_observations_before_reload: savedHost };
   const api = { host, metrics: m, youtube,
     async join() {
-      guest = await tab(guestBrowser, seed.guest, result, cleanup, 'muted-allowed', true, options);
+      guest = await tab(guestBrowser, seed.guest, result, cleanup, 'muted-allowed', true,
+        { ...options, seedUser: !joinTimeline, joinTimeline });
       guest.youtube = youtube;
       api.guest = guest;
       Object.assign(m.raw, { guest_samples: mediaSamples(guest), guest_frames: guest.frames,
@@ -51,7 +53,8 @@ export async function session(ctx, { prepared = false, beforeGuestEnter = null }
       if (beforeGuestEnter) await beforeGuestEnter(guest);
       stopUser = scriptedUser(guest, cleanup, result);
       cleanup.push(async () => { if (!finished) await api.finish(); });
-      await enter(guest, seed.room);
+      if (joinTimeline) await joinFromLanding(guest, seed.room, seed.guest.nickname, ctx.front);
+      else await enter(guest, seed.room, ctx.front);
       m.raw.guest_enter_at = guest.t0;
       return guest;
     },
@@ -94,6 +97,16 @@ export async function session(ctx, { prepared = false, beforeGuestEnter = null }
         host_ws_log: socketLog(host), guest_ws_log: guest ? socketLog(guest) : [],
         host_sent: host.sent.filter(f => f.t <= end), host_frames: host.frames.filter(f => f.t <= end),
         guest_sent: guest ? guest.sent.filter(f => f.t <= end) : [], guest_frames: guest ? guest.frames.filter(f => f.t <= end) : [] });
+      if (joinTimeline && guest) {
+        const withoutAds = samples => samples.map(s => s.ad ? { ...s, none: true } : s);
+        const timeline = joinTimelineStats({ t0: guest.t0, end, roomCode: seed.room.room_code,
+          requests: guest.requests, events: guest.timelineEvents, samples: gs, wsLog: socketLog(guest),
+          frames: guest.frames, clicks: go.user_click_events,
+          errors: positionErrors(withoutAds(hs), withoutAds(gs)) });
+        m.join_timeline = { times: timeline.times, intervals: timeline.intervals };
+        m.raw.join_timeline = { ...timeline.raw, events: guest.timelineEvents, requests: guest.requests };
+        m.raw.guest_clicks = guest.clicks;
+      }
       finished = true;
       return m;
     },
@@ -105,7 +118,7 @@ export async function session(ctx, { prepared = false, beforeGuestEnter = null }
     else await readyHost(host, seed.room);
     m.host_playing_at = host.lastPlayClickAt;
   } else {
-    await enter(host, seed.room);
+    await enter(host, seed.room, ctx.front);
     m.host_playing_at = await waitPlaying(host, { timeout: smoke ? 15000 : youtube ? 60000 : 20000 });
     await until(() => socketLog(host).some(row => row.open_at !== null), 10000, 'host socket open');
   }
