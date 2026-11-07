@@ -3,15 +3,17 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ROOT, REPO, sleep } from './lib/common.mjs';
 import { parseArgs, plan } from './lib/config.mjs';
-import { createDatabase, dropDatabase, seed } from './lib/database.mjs';
+import { createDatabase, dropDatabase, seed, orderedSeed } from './lib/database.mjs';
 import { startServer } from './lib/server.mjs';
-import { staticServer, tone } from './lib/static-server.mjs';
+import { staticServer, tone, syncMedia } from './lib/static-server.mjs';
 import { environment } from './lib/environment.mjs';
 import { resolveCommit } from './lib/commit.mjs';
+import { SYNC_CONDITIONS, syncSongs } from './lib/sync-plan.mjs';
 import { YOUTUBE_VIDEO } from './lib/youtube.mjs';
 
 const opts = parseArgs(process.argv.slice(2));
 if (opts.commit) opts.commit = resolveCommit(opts.commit).sha;
+if (opts.scenario === 'interval_probe' && opts.commit !== resolveCommit('24a8650').sha) throw new Error('interval_probe requires the 24a8650 build');
 const jobs = plan(opts);
 const resultRoot = path.join(ROOT, 'results', opts.smoke ? 'smoke' : 'stage1');
 const stamp = new Date().toISOString().replaceAll(':', '-');
@@ -49,6 +51,7 @@ try {
     const result = { scenario, commit: sha, commit_full: execFileSync('git', ['rev-parse', sha], { cwd: REPO, encoding: 'utf8' }).trim(),
       server_commit: serverSha, condition, run: runNumber, started_at: new Date().toISOString(),
       measurement_pool_size: measurementPoolSize,
+      ...(job.slowAiMs !== undefined ? { slow_ai_ms: job.slowAiMs } : {}),
       server_forced_kills: 0,
       environment: path.relative(ROOT, envPath), smoke: opts.smoke, metrics: {},
       blocked_external_requests: 0, errors: [], ok: false };
@@ -59,14 +62,15 @@ try {
     console.log(`RUN ${scenario} ${sha} ${condition} #${runNumber}`);
     try {
       await createDatabase(database); created = true;
-      server = await startServer(serverSha, database, measurementPoolSize);
+      server = await startServer(serverSha, database, measurementPoolSize, null, job.slowAiMs ?? null);
       result.server_logs = [path.relative(ROOT, server.logPath)];
-      const data = scenario === 'late_join_youtube'
+      const data = SYNC_CONDITIONS[scenario] ? await orderedSeed(database, syncSongs(scenario, condition), { participants: scenario !== 'join_timeline' })
+        : scenario === 'late_join_youtube'
         ? await seed(database, { musicUrl: YOUTUBE_VIDEO.url, title: 'Big Buck Bunny', artist: 'Blender', platform: 'Youtube' })
         : await seed(database);
       const botOnly = scenario === 'reconnect' && condition !== 'browser-10';
       if (!botOnly) {
-        const media = await staticServer(await tone(), 15174); cleanup.push(() => media.close());
+        const media = await staticServer(await (scenario === 'natural_end' ? syncMedia() : tone()), 15174); cleanup.push(() => media.close());
         const front = await staticServer(path.join(ROOT, '.baselines', sha, 'frontend/dist'), 15173, true);
         cleanup.push(() => front.close());
       }
@@ -76,7 +80,7 @@ try {
         const exitedAt = Date.now();
         result.server_restart = { exited_at: exitedAt, fixed_wait_ms: 3000 };
         await sleep(3000);
-        server = await startServer(serverSha, database, measurementPoolSize);
+        server = await startServer(serverSha, database, measurementPoolSize, null, job.slowAiMs ?? null);
         result.server_logs.push(path.relative(ROOT, server.logPath));
         result.server_restart.listen_at = server.listenAt;
         return server;

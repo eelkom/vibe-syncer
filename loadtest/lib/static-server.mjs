@@ -28,6 +28,26 @@ export async function tone() {
   } catch (error) { throw new Error(`ffmpeg tone.webm generation failed: ${error.message}`); }
   return dir;
 }
+// Keep tone.webm and its cache unchanged for all existing scenarios.
+export async function syncMedia() {
+  const dir = await tone();
+  for (const [name, seconds] of [['short', 20], ['long', 900]]) {
+    const target = path.join(dir, `${name}.webm`);
+    try { if ((await stat(target)).size > 0) continue; } catch {}
+    const partial = path.join(dir, `${name}.partial.webm`);
+    try {
+      await promisify(execFile)('/opt/homebrew/bin/ffmpeg', [
+        '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+        '-f', 'lavfi', '-i', `color=c=black:s=16x16:r=1:d=${seconds}`,
+        '-f', 'lavfi', '-i', `sine=frequency=440:sample_rate=48000:duration=${seconds}`,
+        '-t', String(seconds), '-c:v', 'libvpx', '-pix_fmt', 'yuv420p', '-r', '1',
+        '-c:a', 'libopus', '-ac', '1', '-b:a', '32k', partial,
+      ]);
+      await rename(partial, target);
+    } catch (error) { throw new Error(`ffmpeg ${name}.webm generation failed: ${error.message}`); }
+  }
+  return dir;
+}
 export async function staticServer(root, port, spa = false) {
   root = path.resolve(root);
   const server = http.createServer(async (req, res) => {

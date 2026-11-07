@@ -1,5 +1,6 @@
 """Import an untouched archived backend, with AI disabled before app.main imports."""
 import argparse
+import asyncio
 import importlib
 import logging
 import os
@@ -31,7 +32,10 @@ def main():
     parser.add_argument("--database-url", required=True)
     parser.add_argument("--measurement-pool-size", type=int)
     parser.add_argument("--instrument", type=Path)
+    parser.add_argument("--slow-ai-ms", type=int)
     args = parser.parse_args()
+    if args.slow_ai_ms is not None and args.slow_ai_ms < 0:
+        parser.error("--slow-ai-ms must be nonnegative")
     if args.measurement_pool_size is not None and not 1 <= args.measurement_pool_size <= 300:
         parser.error("--measurement-pool-size must be in [1, 300]")
     if args.instrument and not args.instrument.resolve().is_relative_to(Path(__file__).resolve().parents[1]):
@@ -73,10 +77,23 @@ def main():
     if not hasattr(ai, "client") or ai.client is not None:
         raise RuntimeError("AI client must exist and be None")
     async def welcome(*a, **kw):
+        if args.slow_ai_ms is not None:
+            await asyncio.sleep(args.slow_ai_ms / 1000)
         return "Stage1 fixed welcome."
     async def forbidden_dj(*a, **kw):
         raise RuntimeError("Stage1 forbids AI DJ calls")
-    for name, replacement in (("get_ai_welcome_message", welcome), ("get_ai_dj_response", forbidden_dj)):
+    async def slow_dj(*a, **kw):
+        await asyncio.sleep(args.slow_ai_ms / 1000)
+        return "Stage1 fixed DJ response."
+    if args.slow_ai_ms is not None:
+        utils = importlib.import_module("app.utils")
+        def slow_metadata(*a, **kw):
+            time.sleep(args.slow_ai_ms / 1000)
+            return {"title": "Stage1 fixed URL song", "artist": "Stage1", "thumbnail_url": None}
+        utils.extract_video_metadata = slow_metadata
+        logging.info("STAGE1 slow AI/metadata: %d ms", args.slow_ai_ms)
+    for name, replacement in (("get_ai_welcome_message", welcome),
+                              ("get_ai_dj_response", slow_dj if args.slow_ai_ms is not None else forbidden_dj)):
         if hasattr(ai, name):
             setattr(ai, name, replacement)
             logging.info("STAGE1 AI replacement applied: %s; client=None", name)

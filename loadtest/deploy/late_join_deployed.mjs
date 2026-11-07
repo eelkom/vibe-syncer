@@ -8,9 +8,9 @@ import { ROOT, sleep } from '../lib/common.mjs';
 import { YOUTUBE_VIDEO } from '../lib/youtube.mjs';
 import { markdown, summarizeYouTube } from '../summarize_youtube.mjs';
 
-const FRONT = 'https://vibe-syncer.eelkom.com';
+export const FRONT = 'https://vibe-syncer.eelkom.com';
 const API = 'https://vibe-syncer.onrender.com';
-const extraHosts = ['vibe-syncer.eelkom.com', 'vibe-syncer.onrender.com'];
+export const extraHosts = ['vibe-syncer.eelkom.com', 'vibe-syncer.onrender.com'];
 
 export function parseArgs(args) {
   const opts = { runs: 5, frontCommit: null, serverCommit: null };
@@ -52,7 +52,7 @@ async function request(route, { method = 'GET', body, token, timeout = 30000, al
   return { status: response.status, text };
 }
 
-async function wake(result) {
+export async function wake(result) {
   const start = performance.now(), deadline = start + 120000;
   let lastError;
   try {
@@ -69,6 +69,43 @@ async function wake(result) {
   } finally { result.wake_ms = performance.now() - start; }
 }
 
+export async function warm(result) {
+  for (let i = 0; i < 3; i++) {
+    const start = performance.now();
+    const response = await request('/');
+    if (response.status !== 200) throw new Error(`Preparation failed: warm GET /: HTTP ${response.status}`);
+    result.warm_ms.push(performance.now() - start);
+  }
+}
+
+export async function createRoom(result) {
+  const room = JSON.parse((await request('/rooms/', { method: 'POST',
+    body: { name: `loadtest-${Date.now()}`, host_nickname: 'loadtest-host' } })).text);
+  result.room_code = room.room_code;
+  const host = { userId: room.host_id, nickname: 'loadtest-host', isHost: true, token: room.token };
+  return { room, host };
+}
+
+export async function addSong(room, host) {
+  await request(`/rooms/${room.room_code}/queue`, { method: 'POST', token: host.token,
+    body: { music_url: YOUTUBE_VIDEO.url, title: 'Big Buck Bunny', artist: 'Blender' } });
+}
+
+export async function deleteRoom(result, room, host) {
+  if (room && host) {
+    try {
+      const response = await request(`/rooms/${room.room_code}`, { method: 'DELETE', token: host.token, allow404: true });
+      result.room_deleted = response.status === 404 ? 'already' : true;
+    } catch (error) {
+      result.room_deleted = false;
+      result.room_delete_error = error.message ?? String(error);
+      result.errors.push(`room cleanup (${room.room_code}): ${result.room_delete_error}`);
+      result.ok = false;
+      console.error(`Room ${room.room_code} deletion failed: ${result.room_delete_error}`);
+    }
+  }
+}
+
 async function measure(opts, runNumber, target) {
   const result = {
     scenario: 'late_join_deployed', commit: opts.frontCommit, commit_full: opts.frontCommit,
@@ -83,21 +120,12 @@ async function measure(opts, runNumber, target) {
   console.log(`RUN late_join_deployed ${opts.frontCommit} #${runNumber}`);
   try {
     await wake(result);
-    for (let i = 0; i < 3; i++) {
-      const start = performance.now();
-      const response = await request('/');
-      if (response.status !== 200) throw new Error(`Preparation failed: warm GET /: HTTP ${response.status}`);
-      result.warm_ms.push(performance.now() - start);
-    }
-    room = JSON.parse((await request('/rooms/', { method: 'POST',
-      body: { name: `loadtest-${Date.now()}`, host_nickname: 'loadtest-host' } })).text);
-    result.room_code = room.room_code;
-    host = { userId: room.host_id, nickname: 'loadtest-host', isHost: true, token: room.token };
+    await warm(result);
+    ({ room, host } = await createRoom(result));
     const joined = JSON.parse((await request('/rooms/join', { method: 'POST',
       body: { room_code: room.room_code, nickname: 'loadtest-guest' } })).text);
     const guest = { userId: joined.user_id, nickname: 'loadtest-guest', isHost: false, token: joined.token };
-    await request(`/rooms/${room.room_code}/queue`, { method: 'POST', token: host.token,
-      body: { music_url: YOUTUBE_VIDEO.url, title: 'Big Buck Bunny', artist: 'Blender' } });
+    await addSong(room, host);
     const { run } = await import('../scenarios/late_join_youtube.mjs');
     result.metrics = await run({ cleanup, result, seed: { room, host, guest }, smoke: false, front: FRONT, extraHosts });
     result.ok = true;
@@ -113,18 +141,7 @@ async function measure(opts, runNumber, target) {
     const guestFrames = result.browser_artifacts?.find(artifact => artifact.role === 'loadtest-guest')?.frames
       ?? result.metrics.raw?.guest_frames ?? [];
     result.vibebot_frames = guestFrames.filter(frame => frame.data?.type === 'chat' && frame.data.user_id === 0).length;
-    if (room && host) {
-      try {
-        const response = await request(`/rooms/${room.room_code}`, { method: 'DELETE', token: host.token, allow404: true });
-        result.room_deleted = response.status === 404 ? 'already' : true;
-      } catch (error) {
-        result.room_deleted = false;
-        result.room_delete_error = error.message ?? String(error);
-        result.errors.push(`room cleanup (${room.room_code}): ${result.room_delete_error}`);
-        result.ok = false;
-        console.error(`Room ${room.room_code} deletion failed: ${result.room_delete_error}`);
-      }
-    }
+    await deleteRoom(result, room, host);
     if (result.ok) delete result.browser_artifacts;
     result.finished_at = new Date().toISOString();
     await writeFile(target, JSON.stringify(result, null, 2) + '\n', { flag: 'wx' });

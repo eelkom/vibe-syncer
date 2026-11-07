@@ -5,6 +5,8 @@ export const YOUTUBE_VIDEO = Object.freeze({
   url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
 });
 
+export const YOUTUBE_SECOND_VIDEO = Object.freeze({ id: 'eRsGyueVLvQ', url: 'https://www.youtube.com/watch?v=eRsGyueVLvQ' });
+
 export function sampleCounts(samples, start, end) {
   const selected = samples.filter(s => s.t >= start && s.t <= end);
   return {

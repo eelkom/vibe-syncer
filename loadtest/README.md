@@ -301,3 +301,77 @@ node loadtest/summarize_youtube.mjs
 결과는 `results/stage1/late_join_youtube/<sha>/youtube/run-N.json`이며 스모크는 `results/smoke/...`다. 기존 결과 건너뛰기·실패 보존 후 배치 중단·재시도 없음은 동일하다. 요약은 본 실행의 원본만 읽어 표준 출력에 표시하고 실패 회차는 표에 남기되 숫자 집계에서 제외한다.
 
 iframe은 100ms마다 콘솔로 표본을 보내며 iframe 평가를 하지 않는다. 광고의 재생 위치도 원본에 그대로 남기고 주 지표 `err_p95_ms`는 기존 계산을 사용한다. `err_p95_excluding_flagged_ms`만 게스트 표본 또는 호스트 보간에 사용한 표본이 광고·버퍼링인 시각을 제외한다. `interference`는 호스트·게스트 각각 `observation`(호스트는 호스트 입장부터)과 `window`(마지막 10초)의 광고·버퍼링·영상 없음·일시정지·전체 표본 수다. `flags`의 `_window` 접미사는 마지막 구간을 뜻한다. 표본 없음·재생 안 됨은 null과 `guest_never_played`로 기록하며 스크립트 오류가 아니다. 외부 요청 수는 `external_hosts`, DNS 차단 수는 `blocked_hosts`, 페이지 오류는 `youtube_page_errors`에 기록한다.
+
+## 재생 동기화 비교 (#47)
+
+기준 `24a8650`과 수정 커밋을 같은 스크립트로 비교한다. 아래 8개 시나리오는 `--commit`이 필수이고 기존 `all` 실행에 포함되지 않는다. 앱 소스와 기존 결과를 수정하지 않는다. 커밋별 아카이브 준비와 DB 준비는 위 공통 절차를 따른다.
+
+```bash
+loadtest/scripts/prepare_commit.sh 24a8650
+loadtest/scripts/prepare_commit.sh <수정sha>
+node loadtest/run_stage1.mjs --scenario host_no_action --condition local --commit 24a8650 --smoke
+# 스모크를 확인한 뒤 본 측정
+loadtest/scripts/alternate.sh host_no_action local 24a8650 <수정sha> 5
+node loadtest/summarize_sync.mjs > /tmp/vibe-sync-summary.md
+```
+
+`alternate.sh`는 run-1 A, run-1 B, run-2 A, run-2 B 순서로 실행하고 실행 오류에서 멈춘다. `--runs`를 매번 1씩 늘려 기존 회차를 건너뛰므로 수동으로도 번갈아 실행할 수 있다. 결과는 `results/stage1/<시나리오>/<sha>/<조건>/run-N.json`, 스모크는 `results/smoke/`다. 기존 성공 및 실패 원본은 기본적으로 건너뛴다.
+
+| 시나리오 | 조건 | 동작 |
+|---|---|---|
+| host_no_action | local, youtube | 호스트 실제 재생 확인, 무조작 30초, 게스트 입장 후 25초 |
+| join_timeline | local, youtube | 무조작 재생 확인 후 UI sync 준비, 30초 재생, 실제 입장 모달 제출부터 25초 관찰 |
+| song_change | local-next, local-prev, local-jump, youtube-next | 무조작 10초 후 곡 변경, 목표 곡 재생 후 30초, 게스트 25초. prev는 두 번째 곡에서 10초 뒤 첫 곡으로 복귀 |
+| natural_end | local | 20초 short.webm 자연 종료 후 long.webm 재생, 30초 뒤 게스트 입장, 25초 관찰 |
+| host_reconnect | local-seek, youtube-seek | 준비 sync, 게스트 입장 20초 후 호스트 소켓 차단, UI range로 +60초, 8초 뒤 차단 해제, 실제 open 후 40초 |
+| host_reconnect | local-alone | 준비 sync 후 호스트 혼자 20초, 5초 소켓 차단, open 후 10초 뒤 게스트 입장, 25초 관찰 |
+| host_refresh | local | 준비 sync, 게스트 입장 20초 후 호스트 reload, 30초 관찰 |
+| long_playback | youtube-natural | 호스트 무조작 재생, 게스트 입장 후 5분, 30초 구간별 p95 |
+| long_playback | local-disturbed | 게스트 입장 20초부터 30초마다 총 6회 게스트 위치를 10초 뒤로 이동, 마지막 교란 뒤 30초까지 |
+| interval_probe | local-3000, local-5000, local-10000, local-30000 | `24a8650`에서만 실행. 호스트 측정 타이머로 해당 ms마다 sync 전송, local-disturbed와 같은 교란 |
+| server_block | welcome, dj, url | 서버 AI 및 메타데이터 지연 10000ms. 환영 대기 중 또는 채팅 전송 200ms 후 정지 sync의 echo와 응답 도착 관찰 |
+
+호스트는 자동재생 허용 브라우저, 게스트는 사용자 활성화가 필요한 별도 브라우저와 기존 `scriptedUser`를 쓴다. YouTube 조건은 `late_join_youtube`와 같은 iframe 계측과 `YOUTUBE_HOSTS`만 허용하며 두 번째 곡은 `eRsGyueVLvQ`다. server_block의 URL은 서버에서 고정 메타데이터로 치환하므로 외부 접속이 없다. `--slow-ai-ms`가 없으면 기존 서버 치환 동작을 유지한다. 있음에도 대상 함수가 없는 빌드는 서버 로그에 absent로 남는다.
+
+새 계측은 `syncProbe` 옵션으로 켠다. 로컬 표본의 `src`는 쿼리까지 포함한 실제 미디어 주소이며 `tone.webm?song=a`와 `?song=b`를 구분한다. 정적 서버는 pathname으로 파일을 찾아 쿼리와 Range를 함께 지원한다. 기존 600초 `tone.webm`은 유지하고 자연 종료용 `short.webm` 20초와 `long.webm` 900초를 같은 VP8/Opus 형식으로 `.media/`에 추가 캐시한다.
+
+공통 지표는 `join_p95_ms`(게스트 입장 15초부터 25초), 종료 시 호스트 및 게스트 표본, 게스트 첫 sync의 `videoId`, `timestamp`, `received_at`, 호스트 전송 sync 수다. 원본 표본, seeked 이벤트, 송수신 프레임, 소켓 로그는 `metrics.raw`에 남긴다. `guest_src_matches_host`는 같은 시각의 로컬 주소 비교이며 위치 오차와 별도로 확인한다. YouTube의 광고와 버퍼링 표본도 기존처럼 기록한다. 위치 오차는 기존 `positionErrors`와 nearest-rank `percentile`을 사용한다.
+
+`recovery_ms`는 실제 소켓 `open_at`부터 오차 2000ms 미만이 2초 연속 유지되기 시작한 시각까지다. 교란별 복구도 같은 기준이고 다음 교란 전까지 확인되지 않으면 null이다. 표본 간격이 250ms를 넘거나 paused 또는 결측이면 연속 유지를 입증하지 못한다. `restore_at`도 별도로 저장하므로 백오프 대기와 실제 복구를 구분할 수 있다. 재연결 join 및 봇 프레임은 호스트와 게스트별로 따로 센다. `reconnect_frame_counts`는 끊김 전, 차단 중, 실제 open 후, 차단 해제 후를 모두 제공해 open 직전 도착한 프레임도 확인할 수 있다.
+
+interval_probe의 `injected_sync_frames`는 도구가 보낸 수, `host_sync_frames`는 앱 전송까지 포함한 수, `server_forwarded_sync_frames`는 관찰 중 게스트 수신 sync 수다. 복구 목록의 null은 중앙값과 최대값 계산에서 제외하되 `unrecovered_disturbances`에 남긴다. `undisturbed_guest_seeked`는 입장부터 첫 교란 전 및 각 복구의 2초 유지 확인 후부터 다음 교란 전까지의 이벤트 수다. 복구가 없으면 해당 교란 구간 전체를 제외한다.
+
+스모크는 통상 1분 안에 끝나도록 입장 관찰 8초, 사전 대기 1초부터 3초, 재연결 후 관찰 8초, refresh 관찰 10초, YouTube 장시간 관찰 30초로 줄인다. 교란 스모크는 첫 교란 7초, 이후 간격 4초, 총 6회이며 현재 위치가 10초보다 작으면 0으로 제한하고 `clamped`와 `applied_seconds`를 기록한다. 복구가 없는 빌드에서도 짧은 시간에 도구 경로를 점검하기 위한 제한이다. 본 측정에서 10초 교란을 적용할 수 없으면 실행 오류로 남긴다. 자연 종료 음원은 스모크에서도 20초 그대로다. 스모크 p95는 입장 후 최대 8초, 마지막 p95는 최대 3초 구간이므로 본 측정과 직접 비교하지 않는다.
+
+브라우저 e2e는 stage1 밖에서 실행한다. 각 실행은 기존 원본 다음 run 번호에 쓰고 `results/e2e/<이름>/<sha>/run-N.json`을 보존한다. 출력은 `PASS` 또는 `FAIL`, 종료 코드는 관측 판정과 관계없이 실행 성공 0, 도구 또는 준비 오류 2다. 수정 전에 기능이 없으면 없는 상태로 기록한다.
+
+```bash
+node loadtest/e2e/reconnect_recovery.mjs --commit 24a8650
+node loadtest/e2e/reconnect_exhausted.mjs --commit 24a8650
+node loadtest/e2e/ws_room_token.mjs --commit 24a8650
+```
+
+- reconnect_recovery는 게스트가 끊긴 동안 다른 참가자의 채팅과 호스트 토큰의 REST 곡 추가를 수행한다. 차단 해제와 실제 open을 기록하고, open 후 최대 15초 안의 화면 표시 시간을 콘솔 MutationObserver로 수집한다. 초기 scriptedUser를 멈추고 복구 관찰 중 Playwright의 locator, evaluate, focus, bringToFront를 호출하지 않는다. GET queue_list와 chats 요청 수 및 실제 focus 이벤트도 남긴다.
+- reconnect_exhausted는 게스트의 실패한 재시도 5회를 최대 90초 기다린다. `다시 연결` 버튼 유무를 기록하고 있으면 차단 해제 후 클릭, open과 15초 내 위치 복구를 확인한다.
+- ws_room_token은 브라우저 없이 방 A 참가자 토큰의 방 B 및 A 접속, 방 A 호스트 접속, 토큰 없음, 잘못된 토큰을 비교한다. HTTP upgrade 전 거절이면 close code 대신 HTTP 상태가 관측될 수 있다. 성공한 연결은 도구가 1000으로 닫았음을 따로 표시한다.
+
+`summarize_sync.mjs`는 새 stage1 및 e2e 원본만 읽어 시나리오, 조건, 커밋별 회차 값과 숫자 지표의 중앙값 및 최소부터 최대까지 범위를 stdout markdown으로 출력한다. 실패 회차의 값과 오류도 표시한다. 실행 오류 회차만 집계에서 제외하며 e2e의 FAIL은 숨기지 않는다. 원본 JSON을 다시 쓰지 않는다. 다른 결과 루트는 첫 번째 인자로 지정할 수 있다.
+
+검증은 `node --test loadtest/test`, 새 JS 파일의 `node --check`, Python 및 shell 문법 확인까지 수행한다. 실제 브라우저에서는 곡 변경 선택자, range onChange에 의한 실제 +60초 이동, YouTube iframe 표본 및 seeked, 재연결 버튼, 포커스 없는 이력 복구, reload 뒤 표본 재시작을 스모크 원본으로 확인한 뒤 본 측정을 실행한다.
+
+### 입장부터 첫 재생까지 시간
+
+```bash
+node loadtest/run_stage1.mjs --scenario join_timeline --condition local --commit <sha> --runs 5
+node loadtest/run_stage1.mjs --scenario join_timeline --condition youtube --commit <sha> --runs 5
+node loadtest/deploy/join_timeline_deployed.mjs --front-commit <sha> --server-commit <sha> --runs 5
+node loadtest/summarize_sync.mjs > /tmp/join-timeline-summary.md
+```
+
+기존 커밋 준비 절차를 먼저 따른다. 조건을 생략하면 local과 youtube를 모두 실행한다. 스모크에서도 준비 sync 후 30초 재생, 게스트 입장 클릭 후 25초 관찰을 유지한다. 게스트 계정과 sessionStorage를 미리 만들지 않고 랜딩 모달에서 입장한다. 실제 Join Room 버튼의 trusted click이 t0이며 소리 켜기는 기존 `scriptedUser`를 쓴다.
+
+`metrics.join_timeline.times`는 t0 기준 ms, `intervals`는 구간 ms와 `queue_blocking_share` 비율이다. 미관측 값은 null이다. `raw.join_timeline`에 epoch ms 원본 시각, 이벤트와 요청을 남기고 기존 표본과 프레임도 보존한다. 응답은 본문 수신 완료, 로컬 ready는 loadedmetadata, YouTube ready는 top window가 받은 YouTube origin의 onReady message다. 계측은 이벤트 수신과 DOM 관찰만 하며 플레이어 명령을 보내지 않는다. 첫 진행은 광고와 seek 점프를 제외한 같은 소스의 연속 재생 표본에서 확인하며 해상도는 약 100ms다. `total_to_sound`는 t0부터 소리 켜기 이후 첫 muted=false 표본까지다.
+
+`prefetch_upper_bound = max(0, queue_response - room_route)`는 곡 정보 없이 플레이어를 만들 수 있는 가장 이른 시점을 방 경로 진입으로 가정한 상한이다. 실제 개선량이 아니며 `queue_blocking_share`의 분모는 `total_to_progress`다. 분모가 없거나 0이면 null이다. 15초부터 25초 위치 오차 p95는 광고를 제외한 별도 지표다. 요약 표는 회차 값과 실행 성공 회차의 중앙값을 표시한다.
+
+배포 실행은 기존 late_join 배포 실행의 FRONT와 API, 깨우기, 3회 준비 요청, 방 생성, 곡 추가와 방 삭제를 재사용한다. YouTube 조건이며 SHA는 배포 검증 없이 기록한다. 결과는 `results/deploy/join_timeline/<front-commit>/run-N.json`, 회차 간 대기는 10초다. 기존 원본은 건너뛰고 실패 원본 보존 후 중단한다. 로컬 결과는 `results/stage1/join_timeline/<sha>/<condition>/run-N.json`이다.

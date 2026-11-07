@@ -22,12 +22,35 @@ export async function guest(room, nickname) {
   const g = await rest('/rooms/join', { room_code: room.room_code, nickname });
   return { userId: g.user_id, nickname, isHost: false, token: g.token };
 }
-export async function seed(database, { queue = true, musicUrl = 'http://127.0.0.1:15174/tone.webm',
+// Explicit timestamps avoid the transaction-stable now() default tying songs.
+export async function orderedSeed(database, songs, { participants = true } = {}) {
+  if (!songs.length) throw new Error('orderedSeed requires at least one song');
+  const data = await seed(database, { queue: false, participants });
+  const client = new pg.Client({ ...DB, database });
+  await client.connect();
+  const queue = [];
+  const createdAt = Date.now();
+  try {
+    await client.query('BEGIN');
+    for (const [i, song] of songs.entries()) {
+      const row = await client.query(`INSERT INTO queue_items
+        (room_id,user_id,title,artist,thumbnail_url,music_url,platform,is_played,created_at)
+        VALUES ($1,$2,$3,$4,NULL,$5,$6,false,$7) RETURNING *`,
+      [data.room.id, data.room.host_id, song.title, song.artist, song.musicUrl, song.platform,
+        new Date(createdAt + i * 1000)]);
+      queue.push(row.rows[0]);
+    }
+    await client.query('COMMIT');
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { await client.end(); }
+  return { ...data, songs, queue };
+}
+export async function seed(database, { queue = true, participants = true, musicUrl = 'http://127.0.0.1:15174/tone.webm',
   title = 'Stage1 tone', artist = 'Local', platform = 'Local' } = {}) {
   const room = await rest('/rooms/', { name: 'Stage1', host_nickname: 'host' });
   const host = { userId: room.host_id, nickname: 'host', isHost: true, token: room.token };
-  const g = await guest(room, 'observer');
-  const sender = await guest(room, 'sender');
+  const g = participants ? await guest(room, 'observer') : { nickname: 'observer' };
+  const sender = participants ? await guest(room, 'sender') : null;
   if (!queue) return { room, host, guest: g, sender };
   const client = new pg.Client({ ...DB, database });
   await client.connect();

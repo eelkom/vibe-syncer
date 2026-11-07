@@ -1,0 +1,87 @@
+{
+  "scenario": "ws_room_token",
+  "condition": "default",
+  "commit": "24a8650",
+  "commit_full": "24a86502e6b3a751aa6d1c17f9ce409427e6b827",
+  "run": 1,
+  "started_at": "2026-11-06T09:28:19.021Z",
+  "ok": true,
+  "passed": false,
+  "metrics": {
+    "passed": false,
+    "cases": [
+      {
+        "name": "a_token_to_b",
+        "expected_open": false,
+        "opened": true,
+        "opened_at": 1793957301325,
+        "closed_at": 1793957301327,
+        "close_code": 1000,
+        "http_status": null,
+        "error": null,
+        "timed_out": false,
+        "probe_initiated_close": true,
+        "passed": false
+      },
+      {
+        "name": "a_token_to_a",
+        "expected_open": true,
+        "opened": true,
+        "opened_at": 1793957301328,
+        "closed_at": 1793957301330,
+        "close_code": 1000,
+        "http_status": null,
+        "error": null,
+        "timed_out": false,
+        "probe_initiated_close": true,
+        "passed": true
+      },
+      {
+        "name": "a_host_to_a",
+        "expected_open": true,
+        "opened": true,
+        "opened_at": 1793957301331,
+        "closed_at": 1793957301332,
+        "close_code": 1000,
+        "http_status": null,
+        "error": null,
+        "timed_out": false,
+        "probe_initiated_close": true,
+        "passed": true
+      },
+      {
+        "name": "no_token",
+        "expected_open": false,
+        "opened": false,
+        "opened_at": null,
+        "closed_at": 1793957301333,
+        "close_code": 1006,
+        "http_status": 403,
+        "error": "WebSocket was closed before the connection was established",
+        "timed_out": false,
+        "probe_initiated_close": false,
+        "passed": true
+      },
+      {
+        "name": "invalid_token",
+        "expected_open": false,
+        "opened": false,
+        "opened_at": null,
+        "closed_at": 1793957301333,
+        "close_code": 1006,
+        "http_status": 403,
+        "error": "WebSocket was closed before the connection was established",
+        "timed_out": false,
+        "probe_initiated_close": false,
+        "passed": true
+      }
+    ]
+  },
+  "blocked_external_requests": 0,
+  "errors": [],
+  "server_logs": [
+    ".logs/server-loadtest_e2e_ws_room_token_24a8650_1-58652.log"
+  ],
+  "server_forced_kills": 0,
+  "finished_at": "2026-11-06T09:28:21.499Z"
+}
