@@ -214,9 +214,9 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
   });
   return state;
 }
-export async function enter(state, room) {
+export async function enter(state, room, front = FRONT) {
   state.t0 = Date.now();
-  await state.page.goto(`${FRONT}/room/${room.room_code}`, { waitUntil: 'domcontentloaded' });
+  await state.page.goto(`${front}/room/${room.room_code}`, { waitUntil: 'domcontentloaded' });
 }
 export async function samples(state) { return state.page.evaluate(() => window.__samples ?? []); }
 // Call only after observation ends (or an aborted run reaches cleanup).
@@ -297,8 +297,8 @@ export async function readyHost(state, room, alreadyEntered = false) {
   state.lastPlayClickAt = await state.page.evaluate(() => window.__lastPlaybackClickAt);
   await until(() => state.sent.some(f => f.t >= since && f.data.type === 'sync' && f.data.action === 'play'), 5000, 'host play sync frame');
 }
-export async function readyHostYouTube(state, room) {
-  await enter(state, room);
+export async function readyHostYouTube(state, room, front = FRONT) {
+  await enter(state, room, front);
   try {
     await until(() => {
       const s = state.ytSamples.at(-1);

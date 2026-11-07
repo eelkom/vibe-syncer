@@ -4,15 +4,16 @@ import { positionErrors, syncTime, errorAt, median, percentile, countUnexpectedP
 import { YOUTUBE_VIDEO, youtubeDiagnostics, p95ExcludingFlagged } from '../lib/youtube.mjs';
 
 export async function run(ctx) {
-  const { cleanup, result, seed, smoke } = ctx;
-  const hostBrowser = await launch(cleanup, false, { allowHosts: YOUTUBE_HOSTS });
-  const guestBrowser = await launch(cleanup, true, { allowHosts: YOUTUBE_HOSTS });
+  const { cleanup, result, seed, smoke, front, extraHosts } = ctx;
+  const allowHosts = [...YOUTUBE_HOSTS, ...(extraHosts ?? [])];
+  const hostBrowser = await launch(cleanup, false, { allowHosts });
+  const guestBrowser = await launch(cleanup, true, { allowHosts });
   const host = await tab(hostBrowser, seed.host, result, cleanup, 'muted-allowed', true, { youtube: true });
-  await readyHostYouTube(host, seed.room);
+  await readyHostYouTube(host, seed.room, front);
   await sleep(smoke ? 5000 : 30000);
   const guest = await tab(guestBrowser, seed.guest, result, cleanup, 'muted-allowed', true, { youtube: true });
   const stopUser = scriptedUser(guest, cleanup, result);
-  await enter(guest, seed.room);
+  await enter(guest, seed.room, front);
   const duration = smoke ? 8000 : 25000;
   await sleep(Math.max(0, guest.t0 + duration - Date.now()));
   await stopUser();
