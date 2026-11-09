@@ -8,6 +8,8 @@ export const SyncSocketMessageSchema = z.object({
   videoId: z.string().optional(),
   user_id: z.number().int().optional(),
   snapshot: z.boolean().optional(),
+  // Host's estimated one-way delay to the server (half its echo RTT)
+  latency_ms: z.number().nonnegative().optional(),
 });
 
 export const ChatSocketMessageSchema = ChatMessageSchema.extend({
