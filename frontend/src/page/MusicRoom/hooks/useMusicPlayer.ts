@@ -16,8 +16,14 @@ const AUTOPLAY_TIMEOUT_MS = 2000;
 // A sync for a song that isn't current yet is dropped after this time
 const EARLY_SYNC_MAX_AGE_MS = 10000;
 
-// A guest that drifted 2s or more recovers within one interval (loadtest/RESULTS.md)
+// Host position broadcast interval. 2s sent 2.5x the messages without lower
+// error; 10s can leave a drift for up to 10s (loadtest/RESULTS.md)
 const HOST_SYNC_INTERVAL_MS = 5000;
+
+// A play sync seeks when the guest is this far off. The offset left after the
+// join seek is 0.75-1.8s, which 1s and 2s thresholds never corrected; 0.5s
+// added no repeated seeks (loadtest/RESULTS.md)
+const SYNC_SEEK_THRESHOLD_S = 0.5;
 
 // One-way delays above this are treated as outliers (e.g. a stalled tab)
 const MAX_ONE_WAY_MS = 1000;
@@ -356,7 +362,7 @@ const useMusicPlayer = ({
         if (
           timestamp !== undefined &&
           !isBufferingRef.current && // Repeated seeks during buffering restart loading.
-          Math.abs(currentPlayerTime - timestamp) >= 2
+          Math.abs(currentPlayerTime - timestamp) >= SYNC_SEEK_THRESHOLD_S
         ) {
           playerRef.current?.seekTo(timestamp, 'seconds');
           if (duration > 0) setPlayed(timestamp / duration);
