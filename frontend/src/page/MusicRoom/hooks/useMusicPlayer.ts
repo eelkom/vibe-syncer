@@ -16,8 +16,32 @@ const AUTOPLAY_TIMEOUT_MS = 2000;
 // A sync for a song that isn't current yet is dropped after this time
 const EARLY_SYNC_MAX_AGE_MS = 10000;
 
-// A guest that drifted 2s or more recovers within one interval (loadtest/RESULTS.md)
+// Host position broadcast interval. 2s sent 2.5x the messages without lower
+// error; 10s can leave a drift for up to 10s (loadtest/RESULTS.md)
 const HOST_SYNC_INTERVAL_MS = 5000;
+
+// A play sync seeks when the guest is this far off. The offset left after the
+// join seek is 0.75-1.8s, which 1s and 2s thresholds never corrected; 0.5s
+// added no repeated seeks (loadtest/RESULTS.md)
+const SYNC_SEEK_THRESHOLD_S = 0.5;
+
+// One-way delays above this are treated as outliers (e.g. a stalled tab)
+const MAX_ONE_WAY_MS = 1000;
+// Recent RTT samples kept for the median
+const RTT_SAMPLES = 5;
+// Delay before the guest's RTT probe after connecting
+const RTT_PROBE_DELAY_MS = 1000;
+
+const median = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+};
+
+const addRttSample = (samples: number[], rtt: number) => {
+  if (!(rtt >= 0) || rtt / 2 > MAX_ONE_WAY_MS) return;
+  samples.push(rtt);
+  if (samples.length > RTT_SAMPLES) samples.shift();
+};
 
 type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
 
@@ -79,6 +103,12 @@ const useMusicPlayer = ({
   const isBufferingRef = useRef(false);
   const hostPlayingRef = useRef(false);
   const hostHasPlayedRef = useRef(false);
+  // Delivery delay estimate. The server forwards sync without its own clock,
+  // so each side measures its round trip and contributes half of it.
+  const hostSentAtRef = useRef(new Map<number, number>());
+  const hostRttRef = useRef<number[]>([]);
+  const guestRttRef = useRef<number[]>([]);
+  const rttProbeSentAtRef = useRef<number | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
@@ -135,11 +165,19 @@ const useMusicPlayer = ({
   const sendHostState = (action: 'play' | 'pause') => {
     if (!user?.isHost || !currentSong) return;
 
+    const timestamp = getPlaybackTime();
+    const sentAt = performance.now();
+    const sent = hostSentAtRef.current;
+    sent.set(timestamp, sentAt);
+    // Unanswered entries (e.g. sent while disconnected) must not pile up
+    if (sent.size > 20) sent.delete(sent.keys().next().value!);
+    const rtts = hostRttRef.current;
     sendMessage({
       type: 'sync',
       action,
-      timestamp: getPlaybackTime(),
+      timestamp,
       videoId: currentSong.music_url,
+      ...(rtts.length ? { latency_ms: Math.round(median(rtts) / 2) } : {}),
     });
   };
 
@@ -167,8 +205,30 @@ const useMusicPlayer = ({
     }
   });
 
+  const probeGuestRtt = useEffectEvent(() => {
+    if (user?.isHost) return;
+    // request_sync is answered only to this socket, so it doubles as a ping
+    rttProbeSentAtRef.current = performance.now();
+    sendMessage({ type: 'request_sync' });
+  });
+
   useEffect(() => {
-    if (connectionStatus === 'connected') sendHostStateOnConnect();
+    if (connectionStatus !== 'connected') return;
+    sendHostStateOnConnect();
+    // Wait past the snapshot the server pushes on connect, or that snapshot
+    // would be mistaken for the probe's answer
+    const probe = setTimeout(() => probeGuestRtt(), RTT_PROBE_DELAY_MS);
+    // A room without playback state never answers; drop the stale probe
+    const expire = setTimeout(
+      () => {
+        rttProbeSentAtRef.current = null;
+      },
+      RTT_PROBE_DELAY_MS + 2 * MAX_ONE_WAY_MS,
+    );
+    return () => {
+      clearTimeout(probe);
+      clearTimeout(expire);
+    };
   }, [connectionStatus]);
 
   useEffect(() => {
@@ -214,13 +274,49 @@ const useMusicPlayer = ({
 
   const handleSyncMessage = useEffectEvent(
     (message: SyncSocketMessage, receivedAt = performance.now()) => {
-      const { action, timestamp, videoId, user_id } = message;
+      const { action, videoId, user_id } = message;
 
       const isRestoringHost =
         user?.isHost && message.snapshot && !hostHasPlayedRef.current;
       const shouldFollowSync = !user?.isHost || isRestoringHost;
 
-      if (user?.isHost && user_id === user?.userId && !isRestoringHost) return;
+      if (user?.isHost && user_id === user?.userId && !isRestoringHost) {
+        // Our own broadcast came back: one round trip to the server
+        const sentAt =
+          message.timestamp !== undefined
+            ? hostSentAtRef.current.get(message.timestamp)
+            : undefined;
+        if (sentAt !== undefined) {
+          hostSentAtRef.current.delete(message.timestamp!);
+          addRttSample(hostRttRef.current, receivedAt - sentAt);
+        }
+        return;
+      }
+
+      if (message.snapshot && rttProbeSentAtRef.current !== null) {
+        addRttSample(
+          guestRttRef.current,
+          receivedAt - rttProbeSentAtRef.current,
+        );
+        rttProbeSentAtRef.current = null;
+      }
+
+      // The host's position is already old on arrival: host -> server ->
+      // this client. Without a guest sample yet, assume a symmetric path.
+      const hostLeg = message.latency_ms;
+      const guestRtts = guestRttRef.current;
+      const guestLeg = guestRtts.length ? median(guestRtts) / 2 : hostLeg;
+      const delayMs =
+        hostLeg !== undefined && guestLeg !== undefined
+          ? Math.min(hostLeg + guestLeg, MAX_ONE_WAY_MS)
+          : 0;
+      const isAdvancing =
+        action === 'play' ||
+        (action === 'seek' && (lastSyncRef.current?.isPlaying ?? true));
+      const timestamp =
+        message.timestamp !== undefined && isAdvancing && !user?.isHost
+          ? message.timestamp + delayMs / 1000
+          : message.timestamp;
       if (videoId !== currentSong?.music_url) {
         if (shouldFollowSync && videoId) {
           earlySyncRef.current = { message, receivedAt };
@@ -266,7 +362,7 @@ const useMusicPlayer = ({
         if (
           timestamp !== undefined &&
           !isBufferingRef.current && // Repeated seeks during buffering restart loading.
-          Math.abs(currentPlayerTime - timestamp) >= 2
+          Math.abs(currentPlayerTime - timestamp) >= SYNC_SEEK_THRESHOLD_S
         ) {
           playerRef.current?.seekTo(timestamp, 'seconds');
           if (duration > 0) setPlayed(timestamp / duration);
