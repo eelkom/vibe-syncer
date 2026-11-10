@@ -30,6 +30,24 @@ const SYNC_SEEK_THRESHOLD_S = 0.5;
 // be a stalled tab), and the time since arrival is used instead
 const MAX_DELIVERY_MS = 1000;
 
+// A seek loses the time the player needs to load and resume, so the guest
+// seeks this much ahead. First seek after the player mounts (data not loaded):
+// 448-807ms on the deployed server; later seeks in loaded data: about 60-80ms
+// (loadtest/RESULTS.md). Each resume updates the estimate with what was lost.
+const INITIAL_SEEK_LOSS_S = { join: 0.6, resync: 0.1 };
+const MAX_SEEK_LOSS_S = 2;
+// Weight of the newest measured loss in the running estimate
+const SEEK_LOSS_WEIGHT = 0.5;
+// Wait after resuming before reading the position, as it settles
+const RESUME_CHECK_DELAY_MS = 300;
+// Extra seeks allowed to fix one missed seek; the next host sync covers the rest
+const MAX_RECHECK_SEEKS = 2;
+// Right after a seek playback was just interrupted anyway, so a smaller miss is
+// fixed then too; left alone it stays below SYNC_SEEK_THRESHOLD_S for good
+const RECHECK_THRESHOLD_S = 0.2;
+
+type SeekKind = keyof typeof INITIAL_SEEK_LOSS_S;
+
 type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
 
 interface PendingSync {
@@ -92,6 +110,16 @@ const useMusicPlayer = ({
   const isBufferingRef = useRef(false);
   const hostPlayingRef = useRef(false);
   const hostHasPlayedRef = useRef(false);
+  // Learned seek loss per kind, kept across songs
+  const seekLossRef = useRef({ ...INITIAL_SEEK_LOSS_S });
+  // The guest's seek waiting for playback to resume, to be checked then
+  const seekCheckRef = useRef<{
+    kind: SeekKind;
+    compensation: number;
+    rechecks: number;
+  } | null>(null);
+  const hasSeekedThisSongRef = useRef(false);
+  const resumeCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
   const serverClock = useServerClock({
     sendMessage,
     subscribe,
@@ -141,6 +169,8 @@ const useMusicPlayer = ({
     hostPlayingRef.current = false;
     pendingSyncRef.current = null;
     lastSyncRef.current = null;
+    seekCheckRef.current = null;
+    hasSeekedThisSongRef.current = false;
   }, [currentSong?.music_url]);
 
   const getPlaybackTime = () => {
@@ -171,6 +201,18 @@ const useMusicPlayer = ({
     sync.timestamp === undefined
       ? undefined
       : sync.timestamp + (sync.isPlaying ? elapsedSince(sync) : 0);
+
+  // Guest seek to where the host is, ahead by the expected loss, checked once
+  // playback resumes. Only while playing: a paused player loses nothing.
+  const seekToHost = (target: number, rechecks = 0) => {
+    const kind: SeekKind = hasSeekedThisSongRef.current ? 'resync' : 'join';
+    const compensation = seekLossRef.current[kind];
+    hasSeekedThisSongRef.current = true;
+    seekCheckRef.current = { kind, compensation, rechecks };
+    const position = target + compensation;
+    playerRef.current?.seekTo(position, 'seconds');
+    if (duration > 0) setPlayed(position / duration);
+  };
 
   const stampServerTime = () => {
     const serverNow = serverClock.now();
@@ -315,10 +357,16 @@ const useMusicPlayer = ({
         if (
           timestamp !== undefined &&
           !isBufferingRef.current && // Repeated seeks during buffering restart loading.
+          // A seek in progress is checked when playback resumes
+          !seekCheckRef.current &&
           Math.abs(currentPlayerTime - timestamp) >= SYNC_SEEK_THRESHOLD_S
         ) {
-          playerRef.current?.seekTo(timestamp, 'seconds');
-          if (duration > 0) setPlayed(timestamp / duration);
+          if (user?.isHost) {
+            playerRef.current?.seekTo(timestamp, 'seconds');
+            if (duration > 0) setPlayed(timestamp / duration);
+          } else {
+            seekToHost(timestamp);
+          }
         }
       } else if (action === 'pause') {
         clearPendingSeek();
@@ -331,6 +379,9 @@ const useMusicPlayer = ({
       } else if (action === 'seek') {
         // Debounce seek operations to prevent jitter
         clearPendingSeek();
+        // The host loses time on its own seek too, so follow it as is
+        seekCheckRef.current = null;
+        hasSeekedThisSongRef.current = true;
 
         seekTimeoutRef.current = setTimeout(() => {
           const sync = lastSyncRef.current;
@@ -463,7 +514,12 @@ const useMusicPlayer = ({
       pending?.action === 'seek_on_ready' &&
       pending.timestamp !== undefined
     ) {
-      playerRef.current?.seekTo(hostPositionNow(pending)!, 'seconds');
+      const target = hostPositionNow(pending)!;
+      if (!user?.isHost && pending.isPlaying) {
+        seekToHost(target);
+      } else {
+        playerRef.current?.seekTo(target, 'seconds');
+      }
       pendingSyncRef.current = null;
     }
 
@@ -487,6 +543,63 @@ const useMusicPlayer = ({
     fallbackToPendingSync('player error');
   };
 
+  // Runs shortly after a guest's playback resumes, after a seek or buffering.
+  // Seeks again right away if still off, rather than waiting for the next host
+  // sync (up to 5s) and skipping mid-song then. A guest that buffered on its
+  // own only moves forward: it alone skips what it missed.
+  // Plain function: it runs from a timer, and reads refs for anything that changes
+  const checkAfterResume = () => {
+    resumeCheckTimerRef.current = null;
+    if (user?.isHost || isBufferingRef.current) return;
+
+    const sync = lastSyncRef.current;
+    const pendingCheck = seekCheckRef.current;
+    seekCheckRef.current = null;
+    const target = sync ? hostPositionNow(sync) : undefined;
+    if (!sync?.isPlaying || target === undefined) return;
+
+    const behind = target - getPlaybackTime();
+    if (pendingCheck) {
+      const lost = pendingCheck.compensation + behind;
+      const losses = seekLossRef.current;
+      losses[pendingCheck.kind] = Math.min(
+        MAX_SEEK_LOSS_S,
+        Math.max(
+          0,
+          losses[pendingCheck.kind] * (1 - SEEK_LOSS_WEIGHT) +
+            lost * SEEK_LOSS_WEIGHT,
+        ),
+      );
+      if (
+        Math.abs(behind) >= RECHECK_THRESHOLD_S &&
+        pendingCheck.rechecks < MAX_RECHECK_SEEKS
+      ) {
+        logger.log(`[Player] Off by ${behind.toFixed(2)}s after seek, again`);
+        seekToHost(target, pendingCheck.rechecks + 1);
+      }
+    } else if (behind >= SYNC_SEEK_THRESHOLD_S) {
+      logger.log(`[Player] ${behind.toFixed(2)}s behind after buffering`);
+      seekToHost(target, MAX_RECHECK_SEEKS - 1);
+    }
+  };
+
+  const scheduleResumeCheck = () => {
+    if (user?.isHost) return;
+    if (resumeCheckTimerRef.current) clearTimeout(resumeCheckTimerRef.current);
+    resumeCheckTimerRef.current = setTimeout(
+      () => checkAfterResume(),
+      RESUME_CHECK_DELAY_MS,
+    );
+  };
+
+  useEffect(
+    () => () => {
+      if (resumeCheckTimerRef.current)
+        clearTimeout(resumeCheckTimerRef.current);
+    },
+    [],
+  );
+
   const handlePlaybackStart = () => {
     isActuallyPlayingRef.current = true;
     isBufferingRef.current = true;
@@ -498,11 +611,13 @@ const useMusicPlayer = ({
     if (user?.isHost && isPlaying) {
       hostPlayingRef.current = true;
     }
+    scheduleResumeCheck();
   };
 
   const handlePlayerPlay = () => {
     isActuallyPlayingRef.current = true;
     isBufferingRef.current = false;
+    scheduleResumeCheck();
     if (user?.isHost) {
       hostPlayingRef.current = true;
       hostHasPlayedRef.current = true;
