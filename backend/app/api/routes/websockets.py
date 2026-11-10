@@ -25,7 +25,7 @@ from app.ai import (
     get_ai_welcome_message,
 )
 from app.utils import process_music_addition
-from app.core.websocket_manager import manager
+from app.core.websocket_manager import manager, server_now_ms
 from app.auth import SECRET_KEY, ALGORITHM
 
 # Initialize Router
@@ -275,6 +275,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                     # Add sender info and broadcast
                     payload["user_id"] = user_id
                     payload["username"] = username
+                    # When the server got it, for clients that compute the delay
+                    payload["server_ms"] = server_now_ms()
                     # [ADD] Save the latest status to server memory
                     manager.update_room_state(room_id, payload)
                     await manager.broadcast_to_room(room_id, payload)
@@ -288,6 +290,16 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                     if current_state:
                         await websocket.send_json(current_state)
                         logger.info(f"Sent sync state on request to user {user_id} in room {room_id}")
+                    continue
+                # Clock offset probe: answer right away with the server time.
+                # The client times the round trip and assumes the reply was made
+                # halfway through it.
+                if message_type == "time_sync":
+                    await websocket.send_json({
+                        "type": "time_sync",
+                        "id": payload.get("id"),
+                        "server_ms": server_now_ms(),
+                    })
                     continue
                 # --- [B] Chat & AI Logic ---
                 chat_message = payload.get("message", "")
