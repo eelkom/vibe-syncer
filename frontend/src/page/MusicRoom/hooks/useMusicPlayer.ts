@@ -26,16 +26,32 @@ const HOST_SYNC_INTERVAL_MS = 5000;
 // added no repeated seeks (loadtest/RESULTS.md)
 const SYNC_SEEK_THRESHOLD_S = 0.5;
 
-// Delivery delay above this is treated as a bad clock estimate (it would also
-// be a stalled tab), and the time since arrival is used instead
-const MAX_DELIVERY_MS = 1000;
+// Delivery delay above this is treated as a bad clock estimate, and the time
+// since arrival is used instead. The estimate is off by at most half the best
+// probe's round trip, while a slow delivery is real: 1.7s was measured when the
+// connection to the server hiccuped, and 1s rejected it and rewound the guest.
+const MAX_DELIVERY_MS = 5000;
 
 // A seek loses the time the player needs to load and resume, so the guest
 // seeks this much ahead. First seek after the player mounts (data not loaded):
 // 448-807ms on the deployed server; later seeks in loaded data: about 60-80ms
 // (loadtest/RESULTS.md). Each resume updates the estimate with what was lost.
 const INITIAL_SEEK_LOSS_S = { join: 0.6, resync: 0.1 };
-const MAX_SEEK_LOSS_S = 2;
+const MAX_SEEK_LOSS_S = 1;
+// A longer loss is a stalled load, not what the next seek will lose; learning
+// it made the guest overshoot by 0.5s
+const MAX_LEARNED_LOSS_S = 1.5;
+
+const learnSeekLoss = (estimate: number, lost: number) =>
+  lost > MAX_LEARNED_LOSS_S
+    ? estimate
+    : Math.min(
+        MAX_SEEK_LOSS_S,
+        Math.max(
+          0,
+          estimate * (1 - SEEK_LOSS_WEIGHT) + lost * SEEK_LOSS_WEIGHT,
+        ),
+      );
 // Weight of the newest measured loss in the running estimate
 const SEEK_LOSS_WEIGHT = 0.5;
 // Wait after resuming before reading the position, as it settles
@@ -580,15 +596,10 @@ const useMusicPlayer = ({
 
     const behind = target - getPlaybackTime();
     if (pendingCheck) {
-      const lost = pendingCheck.compensation + behind;
       const losses = seekLossRef.current;
-      losses[pendingCheck.kind] = Math.min(
-        MAX_SEEK_LOSS_S,
-        Math.max(
-          0,
-          losses[pendingCheck.kind] * (1 - SEEK_LOSS_WEIGHT) +
-            lost * SEEK_LOSS_WEIGHT,
-        ),
+      losses[pendingCheck.kind] = learnSeekLoss(
+        losses[pendingCheck.kind],
+        pendingCheck.compensation + behind,
       );
       if (
         Math.abs(behind) >= RECHECK_THRESHOLD_S &&
@@ -675,14 +686,7 @@ const useMusicPlayer = ({
       catchUp.stall.position + (performance.now() - catchUp.stall.at) / 1000;
     const behind = target - getPlaybackTime();
     const losses = seekLossRef.current;
-    losses.resync = Math.min(
-      MAX_SEEK_LOSS_S,
-      Math.max(
-        0,
-        losses.resync * (1 - SEEK_LOSS_WEIGHT) +
-          (catchUp.compensation + behind) * SEEK_LOSS_WEIGHT,
-      ),
-    );
+    losses.resync = learnSeekLoss(losses.resync, catchUp.compensation + behind);
     if (
       Math.abs(behind) >= RECHECK_THRESHOLD_S &&
       catchUp.rechecks < MAX_RECHECK_SEEKS
