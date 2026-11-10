@@ -1,6 +1,7 @@
 import useJumpSong from '@/hooks/mutations/useJumpSong';
 import usePlayNextSong from '@/hooks/mutations/usePlayNextSong';
 import usePlayPrevSong from '@/hooks/mutations/usePlayPrevSong';
+import useServerClock from '@/hooks/useServerClock';
 import type { SubscribeSocket } from '@/hooks/useWebSocket';
 import type { QueueResponse } from '@/schemas/queueSchema';
 import type { SyncSocketMessage } from '@/schemas/socketSchema';
@@ -25,23 +26,32 @@ const HOST_SYNC_INTERVAL_MS = 5000;
 // added no repeated seeks (loadtest/RESULTS.md)
 const SYNC_SEEK_THRESHOLD_S = 0.5;
 
-// One-way delays above this are treated as outliers (e.g. a stalled tab)
-const MAX_ONE_WAY_MS = 1000;
-// Recent RTT samples kept for the median
-const RTT_SAMPLES = 5;
-// Delay before the guest's RTT probe after connecting
-const RTT_PROBE_DELAY_MS = 1000;
+// Delivery delay above this is treated as a bad clock estimate (it would also
+// be a stalled tab), and the time since arrival is used instead
+const MAX_DELIVERY_MS = 1000;
 
-const median = (values: number[]) => {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
-};
+// A seek loses the time the player needs to load and resume, so the guest
+// seeks this much ahead. First seek after the player mounts (data not loaded):
+// 448-807ms on the deployed server; later seeks in loaded data: about 60-80ms
+// (loadtest/RESULTS.md). Each resume updates the estimate with what was lost.
+const INITIAL_SEEK_LOSS_S = { join: 0.6, resync: 0.1 };
+const MAX_SEEK_LOSS_S = 2;
+// Weight of the newest measured loss in the running estimate
+const SEEK_LOSS_WEIGHT = 0.5;
+// Wait after resuming before reading the position, as it settles
+const RESUME_CHECK_DELAY_MS = 300;
+// Extra seeks allowed to fix one missed seek; the next host sync covers the rest
+const MAX_RECHECK_SEEKS = 2;
+// Right after a seek playback was just interrupted anyway, so a smaller miss is
+// fixed then too; left alone it stays below SYNC_SEEK_THRESHOLD_S for good
+const RECHECK_THRESHOLD_S = 0.2;
 
-const addRttSample = (samples: number[], rtt: number) => {
-  if (!(rtt >= 0) || rtt / 2 > MAX_ONE_WAY_MS) return;
-  samples.push(rtt);
-  if (samples.length > RTT_SAMPLES) samples.shift();
-};
+type SeekKind = keyof typeof INITIAL_SEEK_LOSS_S;
+
+// Buffering right after the host's own seek is part of that seek, not a stall
+const HOST_SEEK_GRACE_MS = 2000;
+// A longer stall is more likely a sleeping tab; leave it to the host
+const MAX_HOST_CATCH_UP_S = 30;
 
 type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
 
@@ -50,6 +60,8 @@ interface PendingSync {
   action: string;
   receivedAt: number;
   isPlaying: boolean;
+  // Server time the timestamp refers to (position_at_ms, else server_ms)
+  anchorMs?: number;
 }
 
 interface YouTubeInternalPlayer {
@@ -103,12 +115,24 @@ const useMusicPlayer = ({
   const isBufferingRef = useRef(false);
   const hostPlayingRef = useRef(false);
   const hostHasPlayedRef = useRef(false);
-  // Delivery delay estimate. The server forwards sync without its own clock,
-  // so each side measures its round trip and contributes half of it.
-  const hostSentAtRef = useRef(new Map<number, number>());
-  const hostRttRef = useRef<number[]>([]);
-  const guestRttRef = useRef<number[]>([]);
-  const rttProbeSentAtRef = useRef<number | null>(null);
+  // Learned seek loss per kind, kept across songs
+  const seekLossRef = useRef({ ...INITIAL_SEEK_LOSS_S });
+  // The guest's seek waiting for playback to resume, to be checked then
+  const seekCheckRef = useRef<{
+    kind: SeekKind;
+    compensation: number;
+    rechecks: number;
+  } | null>(null);
+  const hasSeekedThisSongRef = useRef(false);
+  // Where the host stalled mid-song, to jump past the stall when it ends
+  const hostStallRef = useRef<{ position: number; at: number } | null>(null);
+  const hostSeekAtRef = useRef(0);
+  const resumeCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const serverClock = useServerClock({
+    sendMessage,
+    subscribe,
+    connectionStatus,
+  });
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
@@ -153,6 +177,9 @@ const useMusicPlayer = ({
     hostPlayingRef.current = false;
     pendingSyncRef.current = null;
     lastSyncRef.current = null;
+    seekCheckRef.current = null;
+    hasSeekedThisSongRef.current = false;
+    hostStallRef.current = null;
   }, [currentSong?.music_url]);
 
   const getPlaybackTime = () => {
@@ -162,22 +189,54 @@ const useMusicPlayer = ({
       : played * duration;
   };
 
+  // Seconds of playback since the host read sync.timestamp. With the server
+  // clock this includes the delivery delay of that very message; without it
+  // (or with an implausible estimate) only the time since arrival counts.
+  const elapsedSince = (sync: PendingSync) => {
+    const sinceArrival = performance.now() - sync.receivedAt;
+    const serverNow = serverClock.now();
+    if (serverNow !== null && sync.anchorMs !== undefined) {
+      const sinceAnchor = serverNow - sync.anchorMs;
+      const delivery = sinceAnchor - sinceArrival;
+      if (delivery >= -50 && delivery <= MAX_DELIVERY_MS) {
+        return Math.max(0, sinceAnchor) / 1000;
+      }
+    }
+    return sinceArrival / 1000;
+  };
+
+  // Where the host is now according to sync
+  const hostPositionNow = (sync: PendingSync) =>
+    sync.timestamp === undefined
+      ? undefined
+      : sync.timestamp + (sync.isPlaying ? elapsedSince(sync) : 0);
+
+  // Guest seek to where the host is, ahead by the expected loss, checked once
+  // playback resumes. Only while playing: a paused player loses nothing.
+  const seekToHost = (target: number, rechecks = 0) => {
+    const kind: SeekKind = hasSeekedThisSongRef.current ? 'resync' : 'join';
+    const compensation = seekLossRef.current[kind];
+    hasSeekedThisSongRef.current = true;
+    seekCheckRef.current = { kind, compensation, rechecks };
+    const position = target + compensation;
+    playerRef.current?.seekTo(position, 'seconds');
+    if (duration > 0) setPlayed(position / duration);
+  };
+
+  const stampServerTime = () => {
+    const serverNow = serverClock.now();
+    return serverNow === null ? {} : { position_at_ms: Math.round(serverNow) };
+  };
+
   const sendHostState = (action: 'play' | 'pause') => {
     if (!user?.isHost || !currentSong) return;
 
-    const timestamp = getPlaybackTime();
-    const sentAt = performance.now();
-    const sent = hostSentAtRef.current;
-    sent.set(timestamp, sentAt);
-    // Unanswered entries (e.g. sent while disconnected) must not pile up
-    if (sent.size > 20) sent.delete(sent.keys().next().value!);
-    const rtts = hostRttRef.current;
     sendMessage({
       type: 'sync',
       action,
-      timestamp,
+      timestamp: getPlaybackTime(),
       videoId: currentSong.music_url,
-      ...(rtts.length ? { latency_ms: Math.round(median(rtts) / 2) } : {}),
+      ...stampServerTime(),
     });
   };
 
@@ -205,30 +264,8 @@ const useMusicPlayer = ({
     }
   });
 
-  const probeGuestRtt = useEffectEvent(() => {
-    if (user?.isHost) return;
-    // request_sync is answered only to this socket, so it doubles as a ping
-    rttProbeSentAtRef.current = performance.now();
-    sendMessage({ type: 'request_sync' });
-  });
-
   useEffect(() => {
-    if (connectionStatus !== 'connected') return;
-    sendHostStateOnConnect();
-    // Wait past the snapshot the server pushes on connect, or that snapshot
-    // would be mistaken for the probe's answer
-    const probe = setTimeout(() => probeGuestRtt(), RTT_PROBE_DELAY_MS);
-    // A room without playback state never answers; drop the stale probe
-    const expire = setTimeout(
-      () => {
-        rttProbeSentAtRef.current = null;
-      },
-      RTT_PROBE_DELAY_MS + 2 * MAX_ONE_WAY_MS,
-    );
-    return () => {
-      clearTimeout(probe);
-      clearTimeout(expire);
-    };
+    if (connectionStatus === 'connected') sendHostStateOnConnect();
   }, [connectionStatus]);
 
   useEffect(() => {
@@ -280,43 +317,8 @@ const useMusicPlayer = ({
         user?.isHost && message.snapshot && !hostHasPlayedRef.current;
       const shouldFollowSync = !user?.isHost || isRestoringHost;
 
-      if (user?.isHost && user_id === user?.userId && !isRestoringHost) {
-        // Our own broadcast came back: one round trip to the server
-        const sentAt =
-          message.timestamp !== undefined
-            ? hostSentAtRef.current.get(message.timestamp)
-            : undefined;
-        if (sentAt !== undefined) {
-          hostSentAtRef.current.delete(message.timestamp!);
-          addRttSample(hostRttRef.current, receivedAt - sentAt);
-        }
-        return;
-      }
+      if (user?.isHost && user_id === user?.userId && !isRestoringHost) return;
 
-      if (message.snapshot && rttProbeSentAtRef.current !== null) {
-        addRttSample(
-          guestRttRef.current,
-          receivedAt - rttProbeSentAtRef.current,
-        );
-        rttProbeSentAtRef.current = null;
-      }
-
-      // The host's position is already old on arrival: host -> server ->
-      // this client. Without a guest sample yet, assume a symmetric path.
-      const hostLeg = message.latency_ms;
-      const guestRtts = guestRttRef.current;
-      const guestLeg = guestRtts.length ? median(guestRtts) / 2 : hostLeg;
-      const delayMs =
-        hostLeg !== undefined && guestLeg !== undefined
-          ? Math.min(hostLeg + guestLeg, MAX_ONE_WAY_MS)
-          : 0;
-      const isAdvancing =
-        action === 'play' ||
-        (action === 'seek' && (lastSyncRef.current?.isPlaying ?? true));
-      const timestamp =
-        message.timestamp !== undefined && isAdvancing && !user?.isHost
-          ? message.timestamp + delayMs / 1000
-          : message.timestamp;
       if (videoId !== currentSong?.music_url) {
         if (shouldFollowSync && videoId) {
           earlySyncRef.current = { message, receivedAt };
@@ -326,14 +328,16 @@ const useMusicPlayer = ({
 
       // A seek keeps the previous play/pause state
       lastSyncRef.current = {
-        timestamp,
+        timestamp: message.timestamp,
         action:
           action === 'seek' ? (lastSyncRef.current?.action ?? 'play') : action,
         receivedAt,
         isPlaying:
           action === 'play' ||
           (action === 'seek' && (lastSyncRef.current?.isPlaying ?? true)),
+        anchorMs: message.position_at_ms ?? message.server_ms,
       };
+      const timestamp = hostPositionNow(lastSyncRef.current);
 
       if (shouldFollowSync && !isPlayerEnabled) {
         pendingSyncRef.current = lastSyncRef.current;
@@ -362,10 +366,16 @@ const useMusicPlayer = ({
         if (
           timestamp !== undefined &&
           !isBufferingRef.current && // Repeated seeks during buffering restart loading.
+          // A seek in progress is checked when playback resumes
+          !seekCheckRef.current &&
           Math.abs(currentPlayerTime - timestamp) >= SYNC_SEEK_THRESHOLD_S
         ) {
-          playerRef.current?.seekTo(timestamp, 'seconds');
-          if (duration > 0) setPlayed(timestamp / duration);
+          if (user?.isHost) {
+            playerRef.current?.seekTo(timestamp, 'seconds');
+            if (duration > 0) setPlayed(timestamp / duration);
+          } else {
+            seekToHost(timestamp);
+          }
         }
       } else if (action === 'pause') {
         clearPendingSeek();
@@ -378,11 +388,16 @@ const useMusicPlayer = ({
       } else if (action === 'seek') {
         // Debounce seek operations to prevent jitter
         clearPendingSeek();
+        // The host loses time on its own seek too, so follow it as is
+        seekCheckRef.current = null;
+        hasSeekedThisSongRef.current = true;
 
         seekTimeoutRef.current = setTimeout(() => {
-          if (timestamp !== undefined) {
-            playerRef.current?.seekTo(timestamp, 'seconds');
-            if (duration > 0) setPlayed(timestamp / duration);
+          const sync = lastSyncRef.current;
+          const target = sync ? hostPositionNow(sync) : timestamp;
+          if (target !== undefined) {
+            playerRef.current?.seekTo(target, 'seconds');
+            if (duration > 0) setPlayed(target / duration);
           }
         }, 100);
       }
@@ -405,23 +420,12 @@ const useMusicPlayer = ({
     if (!early || early.message.videoId !== currentSong?.music_url) return;
 
     earlySyncRef.current = null;
-    const now = performance.now();
-    const age = now - early.receivedAt;
+    const age = performance.now() - early.receivedAt;
     if (age > EARLY_SYNC_MAX_AGE_MS) return;
 
-    const { action, timestamp } = early.message;
     logger.log(`[Player] Applying sync received ${Math.round(age)}ms early`);
-    // A play timestamp already includes age, so its time base also moves to now.
-    handleSyncMessage(
-      {
-        ...early.message,
-        timestamp:
-          action === 'play' && timestamp !== undefined
-            ? timestamp + age / 1000
-            : timestamp,
-      },
-      action === 'play' ? now : early.receivedAt,
-    );
+    // The original arrival time keeps the elapsed time counted
+    handleSyncMessage(early.message, early.receivedAt);
   });
 
   useEffect(() => {
@@ -462,6 +466,7 @@ const useMusicPlayer = ({
 
   const handleSeek = (amount: number) => {
     setPlayed(amount);
+    hostSeekAtRef.current = performance.now();
     playerRef.current?.seekTo(amount, 'fraction');
     if (user?.isHost && currentSong) {
       sendMessage({
@@ -469,6 +474,7 @@ const useMusicPlayer = ({
         action: 'seek',
         timestamp: amount * duration, // fraction to seconds
         videoId: currentSong.music_url,
+        ...stampServerTime(),
       });
     }
   };
@@ -518,12 +524,12 @@ const useMusicPlayer = ({
       pending?.action === 'seek_on_ready' &&
       pending.timestamp !== undefined
     ) {
-      const timestamp =
-        pending.timestamp +
-        (pending.isPlaying
-          ? (performance.now() - pending.receivedAt) / 1000
-          : 0);
-      playerRef.current?.seekTo(timestamp, 'seconds');
+      const target = hostPositionNow(pending)!;
+      if (!user?.isHost && pending.isPlaying) {
+        seekToHost(target);
+      } else {
+        playerRef.current?.seekTo(target, 'seconds');
+      }
       pendingSyncRef.current = null;
     }
 
@@ -547,10 +553,95 @@ const useMusicPlayer = ({
     fallbackToPendingSync('player error');
   };
 
+  // Runs shortly after a guest's playback resumes, after a seek or buffering.
+  // Seeks again right away if still off, rather than waiting for the next host
+  // sync (up to 5s) and skipping mid-song then. A guest that buffered on its
+  // own only moves forward: it alone skips what it missed.
+  // Plain function: it runs from a timer, and reads refs for anything that changes
+  const checkAfterResume = () => {
+    resumeCheckTimerRef.current = null;
+    if (user?.isHost || isBufferingRef.current) return;
+
+    const sync = lastSyncRef.current;
+    const pendingCheck = seekCheckRef.current;
+    seekCheckRef.current = null;
+    const target = sync ? hostPositionNow(sync) : undefined;
+    if (!sync?.isPlaying || target === undefined) return;
+
+    const behind = target - getPlaybackTime();
+    if (pendingCheck) {
+      const lost = pendingCheck.compensation + behind;
+      const losses = seekLossRef.current;
+      losses[pendingCheck.kind] = Math.min(
+        MAX_SEEK_LOSS_S,
+        Math.max(
+          0,
+          losses[pendingCheck.kind] * (1 - SEEK_LOSS_WEIGHT) +
+            lost * SEEK_LOSS_WEIGHT,
+        ),
+      );
+      if (
+        Math.abs(behind) >= RECHECK_THRESHOLD_S &&
+        pendingCheck.rechecks < MAX_RECHECK_SEEKS
+      ) {
+        logger.log(`[Player] Off by ${behind.toFixed(2)}s after seek, again`);
+        seekToHost(target, pendingCheck.rechecks + 1);
+      }
+    } else if (behind >= SYNC_SEEK_THRESHOLD_S) {
+      logger.log(`[Player] ${behind.toFixed(2)}s behind after buffering`);
+      seekToHost(target, MAX_RECHECK_SEEKS - 1);
+    }
+  };
+
+  const scheduleResumeCheck = () => {
+    if (user?.isHost) return;
+    if (resumeCheckTimerRef.current) clearTimeout(resumeCheckTimerRef.current);
+    resumeCheckTimerRef.current = setTimeout(
+      () => checkAfterResume(),
+      RESUME_CHECK_DELAY_MS,
+    );
+  };
+
+  useEffect(
+    () => () => {
+      if (resumeCheckTimerRef.current)
+        clearTimeout(resumeCheckTimerRef.current);
+    },
+    [],
+  );
+
   const handlePlaybackStart = () => {
+    if (
+      user?.isHost &&
+      hostPlayingRef.current &&
+      performance.now() - hostSeekAtRef.current > HOST_SEEK_GRACE_MS
+    ) {
+      hostStallRef.current = {
+        position: getPlaybackTime(),
+        at: performance.now(),
+      };
+    }
     isActuallyPlayingRef.current = true;
     isBufferingRef.current = true;
     hostPlayingRef.current = false;
+  };
+
+  // Guests kept playing while the host stalled. Resuming in place would put the
+  // host behind them, and its next sync would pull every guest back; the host
+  // alone skips ahead instead.
+  const catchUpAfterHostStall = () => {
+    const stall = hostStallRef.current;
+    hostStallRef.current = null;
+    if (!user?.isHost || !stall || !isPlaying) return;
+
+    const stalled = (performance.now() - stall.at) / 1000;
+    if (stalled > MAX_HOST_CATCH_UP_S) return;
+    const target = stall.position + stalled;
+    if (target - getPlaybackTime() < SYNC_SEEK_THRESHOLD_S) return;
+
+    logger.log(`[Player] Host stalled ${stalled.toFixed(2)}s, skipping ahead`);
+    hostSeekAtRef.current = performance.now();
+    playerRef.current?.seekTo(target + seekLossRef.current.resync, 'seconds');
   };
 
   const handleBufferEnd = () => {
@@ -558,11 +649,14 @@ const useMusicPlayer = ({
     if (user?.isHost && isPlaying) {
       hostPlayingRef.current = true;
     }
+    catchUpAfterHostStall();
+    scheduleResumeCheck();
   };
 
   const handlePlayerPlay = () => {
     isActuallyPlayingRef.current = true;
     isBufferingRef.current = false;
+    scheduleResumeCheck();
     if (user?.isHost) {
       hostPlayingRef.current = true;
       hostHasPlayedRef.current = true;

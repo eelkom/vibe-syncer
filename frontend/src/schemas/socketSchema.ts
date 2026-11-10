@@ -8,8 +8,10 @@ export const SyncSocketMessageSchema = z.object({
   videoId: z.string().optional(),
   user_id: z.number().int().optional(),
   snapshot: z.boolean().optional(),
-  // Host's estimated one-way delay to the server (half its echo RTT)
-  latency_ms: z.number().nonnegative().optional(),
+  // Server time (ms) when the host read timestamp from its player
+  position_at_ms: z.number().optional(),
+  // Server time (ms) when the server received or built this message
+  server_ms: z.number().optional(),
 });
 
 export const ChatSocketMessageSchema = ChatMessageSchema.extend({
@@ -25,11 +27,18 @@ export const QueueUpdateSocketMessageSchema = z.object({
   type: z.literal('queue_update'),
 });
 
+export const TimeSyncSocketMessageSchema = z.object({
+  type: z.literal('time_sync'),
+  id: z.number(),
+  server_ms: z.number(),
+});
+
 export const SocketMessageSchema = z.discriminatedUnion('type', [
   SyncSocketMessageSchema,
   ChatSocketMessageSchema,
   SystemSocketMessageSchema,
   QueueUpdateSocketMessageSchema,
+  TimeSyncSocketMessageSchema,
 ]);
 
 export type SyncSocketMessage = z.infer<typeof SyncSocketMessageSchema>;
@@ -38,12 +47,14 @@ export type SystemSocketMessage = z.infer<typeof SystemSocketMessageSchema>;
 export type QueueUpdateSocketMessage = z.infer<
   typeof QueueUpdateSocketMessageSchema
 >;
+export type TimeSyncSocketMessage = z.infer<typeof TimeSyncSocketMessageSchema>;
 
 export interface SocketMessageMap {
   sync: SyncSocketMessage;
   chat: ChatSocketMessage;
   system: SystemSocketMessage;
   queue_update: QueueUpdateSocketMessage;
+  time_sync: TimeSyncSocketMessage;
 }
 
 export type SocketMessageType = keyof SocketMessageMap;
