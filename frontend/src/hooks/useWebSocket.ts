@@ -54,6 +54,7 @@ const useWebSocket = (roomCode: string) => {
     chat: new Set(),
     system: new Set(),
     queue_update: new Set(),
+    time_sync: new Set(),
   });
   const [connectionStatus, setConnectionStatus] =
     useState<WebSocketConnectionStatus>('disconnected');
@@ -88,7 +89,10 @@ const useWebSocket = (roomCode: string) => {
 
   const user = JSON.parse(sessionStorage.getItem('user') || 'null');
   const token = user?.token;
-  const [connectionIdentity, setConnectionIdentity] = useState({ roomCode, token });
+  const [connectionIdentity, setConnectionIdentity] = useState({
+    roomCode,
+    token,
+  });
 
   // Reset before effects so a new room or token cannot trigger recovery fetches.
   if (
@@ -179,6 +183,14 @@ const useWebSocket = (roomCode: string) => {
           case 'queue_update':
             dispatch('queue_update', message);
             break;
+          case 'time_sync':
+            dispatch('time_sync', message);
+            break;
+          default: {
+            // Adding a message type without a case here drops it silently
+            const unhandled: never = message;
+            logger.log('[WS] Unhandled message:', unhandled);
+          }
         }
       };
 

@@ -1,6 +1,7 @@
 import useJumpSong from '@/hooks/mutations/useJumpSong';
 import usePlayNextSong from '@/hooks/mutations/usePlayNextSong';
 import usePlayPrevSong from '@/hooks/mutations/usePlayPrevSong';
+import useServerClock from '@/hooks/useServerClock';
 import type { SubscribeSocket } from '@/hooks/useWebSocket';
 import type { QueueResponse } from '@/schemas/queueSchema';
 import type { SyncSocketMessage } from '@/schemas/socketSchema';
@@ -25,23 +26,9 @@ const HOST_SYNC_INTERVAL_MS = 5000;
 // added no repeated seeks (loadtest/RESULTS.md)
 const SYNC_SEEK_THRESHOLD_S = 0.5;
 
-// One-way delays above this are treated as outliers (e.g. a stalled tab)
-const MAX_ONE_WAY_MS = 1000;
-// Recent RTT samples kept for the median
-const RTT_SAMPLES = 5;
-// Delay before the guest's RTT probe after connecting
-const RTT_PROBE_DELAY_MS = 1000;
-
-const median = (values: number[]) => {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
-};
-
-const addRttSample = (samples: number[], rtt: number) => {
-  if (!(rtt >= 0) || rtt / 2 > MAX_ONE_WAY_MS) return;
-  samples.push(rtt);
-  if (samples.length > RTT_SAMPLES) samples.shift();
-};
+// Delivery delay above this is treated as a bad clock estimate (it would also
+// be a stalled tab), and the time since arrival is used instead
+const MAX_DELIVERY_MS = 1000;
 
 type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
 
@@ -50,6 +37,8 @@ interface PendingSync {
   action: string;
   receivedAt: number;
   isPlaying: boolean;
+  // Server time the timestamp refers to (position_at_ms, else server_ms)
+  anchorMs?: number;
 }
 
 interface YouTubeInternalPlayer {
@@ -103,12 +92,11 @@ const useMusicPlayer = ({
   const isBufferingRef = useRef(false);
   const hostPlayingRef = useRef(false);
   const hostHasPlayedRef = useRef(false);
-  // Delivery delay estimate. The server forwards sync without its own clock,
-  // so each side measures its round trip and contributes half of it.
-  const hostSentAtRef = useRef(new Map<number, number>());
-  const hostRttRef = useRef<number[]>([]);
-  const guestRttRef = useRef<number[]>([]);
-  const rttProbeSentAtRef = useRef<number | null>(null);
+  const serverClock = useServerClock({
+    sendMessage,
+    subscribe,
+    connectionStatus,
+  });
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
@@ -162,22 +150,42 @@ const useMusicPlayer = ({
       : played * duration;
   };
 
+  // Seconds of playback since the host read sync.timestamp. With the server
+  // clock this includes the delivery delay of that very message; without it
+  // (or with an implausible estimate) only the time since arrival counts.
+  const elapsedSince = (sync: PendingSync) => {
+    const sinceArrival = performance.now() - sync.receivedAt;
+    const serverNow = serverClock.now();
+    if (serverNow !== null && sync.anchorMs !== undefined) {
+      const sinceAnchor = serverNow - sync.anchorMs;
+      const delivery = sinceAnchor - sinceArrival;
+      if (delivery >= -50 && delivery <= MAX_DELIVERY_MS) {
+        return Math.max(0, sinceAnchor) / 1000;
+      }
+    }
+    return sinceArrival / 1000;
+  };
+
+  // Where the host is now according to sync
+  const hostPositionNow = (sync: PendingSync) =>
+    sync.timestamp === undefined
+      ? undefined
+      : sync.timestamp + (sync.isPlaying ? elapsedSince(sync) : 0);
+
+  const stampServerTime = () => {
+    const serverNow = serverClock.now();
+    return serverNow === null ? {} : { position_at_ms: Math.round(serverNow) };
+  };
+
   const sendHostState = (action: 'play' | 'pause') => {
     if (!user?.isHost || !currentSong) return;
 
-    const timestamp = getPlaybackTime();
-    const sentAt = performance.now();
-    const sent = hostSentAtRef.current;
-    sent.set(timestamp, sentAt);
-    // Unanswered entries (e.g. sent while disconnected) must not pile up
-    if (sent.size > 20) sent.delete(sent.keys().next().value!);
-    const rtts = hostRttRef.current;
     sendMessage({
       type: 'sync',
       action,
-      timestamp,
+      timestamp: getPlaybackTime(),
       videoId: currentSong.music_url,
-      ...(rtts.length ? { latency_ms: Math.round(median(rtts) / 2) } : {}),
+      ...stampServerTime(),
     });
   };
 
@@ -205,30 +213,8 @@ const useMusicPlayer = ({
     }
   });
 
-  const probeGuestRtt = useEffectEvent(() => {
-    if (user?.isHost) return;
-    // request_sync is answered only to this socket, so it doubles as a ping
-    rttProbeSentAtRef.current = performance.now();
-    sendMessage({ type: 'request_sync' });
-  });
-
   useEffect(() => {
-    if (connectionStatus !== 'connected') return;
-    sendHostStateOnConnect();
-    // Wait past the snapshot the server pushes on connect, or that snapshot
-    // would be mistaken for the probe's answer
-    const probe = setTimeout(() => probeGuestRtt(), RTT_PROBE_DELAY_MS);
-    // A room without playback state never answers; drop the stale probe
-    const expire = setTimeout(
-      () => {
-        rttProbeSentAtRef.current = null;
-      },
-      RTT_PROBE_DELAY_MS + 2 * MAX_ONE_WAY_MS,
-    );
-    return () => {
-      clearTimeout(probe);
-      clearTimeout(expire);
-    };
+    if (connectionStatus === 'connected') sendHostStateOnConnect();
   }, [connectionStatus]);
 
   useEffect(() => {
@@ -280,43 +266,8 @@ const useMusicPlayer = ({
         user?.isHost && message.snapshot && !hostHasPlayedRef.current;
       const shouldFollowSync = !user?.isHost || isRestoringHost;
 
-      if (user?.isHost && user_id === user?.userId && !isRestoringHost) {
-        // Our own broadcast came back: one round trip to the server
-        const sentAt =
-          message.timestamp !== undefined
-            ? hostSentAtRef.current.get(message.timestamp)
-            : undefined;
-        if (sentAt !== undefined) {
-          hostSentAtRef.current.delete(message.timestamp!);
-          addRttSample(hostRttRef.current, receivedAt - sentAt);
-        }
-        return;
-      }
+      if (user?.isHost && user_id === user?.userId && !isRestoringHost) return;
 
-      if (message.snapshot && rttProbeSentAtRef.current !== null) {
-        addRttSample(
-          guestRttRef.current,
-          receivedAt - rttProbeSentAtRef.current,
-        );
-        rttProbeSentAtRef.current = null;
-      }
-
-      // The host's position is already old on arrival: host -> server ->
-      // this client. Without a guest sample yet, assume a symmetric path.
-      const hostLeg = message.latency_ms;
-      const guestRtts = guestRttRef.current;
-      const guestLeg = guestRtts.length ? median(guestRtts) / 2 : hostLeg;
-      const delayMs =
-        hostLeg !== undefined && guestLeg !== undefined
-          ? Math.min(hostLeg + guestLeg, MAX_ONE_WAY_MS)
-          : 0;
-      const isAdvancing =
-        action === 'play' ||
-        (action === 'seek' && (lastSyncRef.current?.isPlaying ?? true));
-      const timestamp =
-        message.timestamp !== undefined && isAdvancing && !user?.isHost
-          ? message.timestamp + delayMs / 1000
-          : message.timestamp;
       if (videoId !== currentSong?.music_url) {
         if (shouldFollowSync && videoId) {
           earlySyncRef.current = { message, receivedAt };
@@ -326,14 +277,16 @@ const useMusicPlayer = ({
 
       // A seek keeps the previous play/pause state
       lastSyncRef.current = {
-        timestamp,
+        timestamp: message.timestamp,
         action:
           action === 'seek' ? (lastSyncRef.current?.action ?? 'play') : action,
         receivedAt,
         isPlaying:
           action === 'play' ||
           (action === 'seek' && (lastSyncRef.current?.isPlaying ?? true)),
+        anchorMs: message.position_at_ms ?? message.server_ms,
       };
+      const timestamp = hostPositionNow(lastSyncRef.current);
 
       if (shouldFollowSync && !isPlayerEnabled) {
         pendingSyncRef.current = lastSyncRef.current;
@@ -380,9 +333,11 @@ const useMusicPlayer = ({
         clearPendingSeek();
 
         seekTimeoutRef.current = setTimeout(() => {
-          if (timestamp !== undefined) {
-            playerRef.current?.seekTo(timestamp, 'seconds');
-            if (duration > 0) setPlayed(timestamp / duration);
+          const sync = lastSyncRef.current;
+          const target = sync ? hostPositionNow(sync) : timestamp;
+          if (target !== undefined) {
+            playerRef.current?.seekTo(target, 'seconds');
+            if (duration > 0) setPlayed(target / duration);
           }
         }, 100);
       }
@@ -405,23 +360,12 @@ const useMusicPlayer = ({
     if (!early || early.message.videoId !== currentSong?.music_url) return;
 
     earlySyncRef.current = null;
-    const now = performance.now();
-    const age = now - early.receivedAt;
+    const age = performance.now() - early.receivedAt;
     if (age > EARLY_SYNC_MAX_AGE_MS) return;
 
-    const { action, timestamp } = early.message;
     logger.log(`[Player] Applying sync received ${Math.round(age)}ms early`);
-    // A play timestamp already includes age, so its time base also moves to now.
-    handleSyncMessage(
-      {
-        ...early.message,
-        timestamp:
-          action === 'play' && timestamp !== undefined
-            ? timestamp + age / 1000
-            : timestamp,
-      },
-      action === 'play' ? now : early.receivedAt,
-    );
+    // The original arrival time keeps the elapsed time counted
+    handleSyncMessage(early.message, early.receivedAt);
   });
 
   useEffect(() => {
@@ -469,6 +413,7 @@ const useMusicPlayer = ({
         action: 'seek',
         timestamp: amount * duration, // fraction to seconds
         videoId: currentSong.music_url,
+        ...stampServerTime(),
       });
     }
   };
@@ -518,12 +463,7 @@ const useMusicPlayer = ({
       pending?.action === 'seek_on_ready' &&
       pending.timestamp !== undefined
     ) {
-      const timestamp =
-        pending.timestamp +
-        (pending.isPlaying
-          ? (performance.now() - pending.receivedAt) / 1000
-          : 0);
-      playerRef.current?.seekTo(timestamp, 'seconds');
+      playerRef.current?.seekTo(hostPositionNow(pending)!, 'seconds');
       pendingSyncRef.current = null;
     }
 
