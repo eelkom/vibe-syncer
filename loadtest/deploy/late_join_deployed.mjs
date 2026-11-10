@@ -1,4 +1,5 @@
 // 실행: node loadtest/deploy/late_join_deployed.mjs --front-commit <sha> --server-commit <sha> [--runs 5]
+// 같은 프론트를 다른 서버로 다시 잴 때는 결과 폴더가 <front>-s<server>가 된다(669a045 이후 서버).
 // 주의: 실제 배포 서버에 접속하며, 입장마다 Gemini 호출이 발생할 수 있다.
 // 부하용 봇 없이 호스트·게스트 브라우저만 사용한다. SHA는 배포 검증 없이 결과에 기록만 한다.
 import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
@@ -32,8 +33,15 @@ export function parseArgs(args) {
   return opts;
 }
 
-export function resultPath(frontCommit, runNumber) {
-  return path.join(ROOT, 'results/deploy/late_join', frontCommit, `run-${runNumber}.json`);
+// Folders before the server clock (#63) hold only the front commit
+const LEGACY_SERVER = '669a045';
+export function resultDir(frontCommit, serverCommit = LEGACY_SERVER) {
+  const name = serverCommit.startsWith(LEGACY_SERVER) || serverCommit === frontCommit ? frontCommit : `${frontCommit}-s${serverCommit}`;
+  return path.join(ROOT, 'results/deploy/late_join', name);
+}
+
+export function resultPath(frontCommit, runNumber, serverCommit) {
+  return path.join(resultDir(frontCommit, serverCommit), `run-${runNumber}.json`);
 }
 
 async function request(route, { method = 'GET', body, token, timeout = 30000, allow404 = false } = {}) {
@@ -159,7 +167,7 @@ export async function main(args = process.argv.slice(2)) {
   let measured = false;
   try {
     for (let runNumber = 1; runNumber <= opts.runs; runNumber++) {
-      const target = resultPath(opts.frontCommit, runNumber);
+      const target = resultPath(opts.frontCommit, runNumber, opts.serverCommit);
       let exists = false;
       try { await stat(target); exists = true; }
       catch (error) { if (error.code !== 'ENOENT') throw error; }
