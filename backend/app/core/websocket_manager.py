@@ -8,6 +8,21 @@ import time
 # Logger Settings
 logger = logging.getLogger(__name__)
 
+
+def server_now_ms() -> float:
+    """Wall clock in ms. Clients estimate their offset to it with time_sync."""
+    return time.time() * 1000
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+# The host-stamped elapsed time may exceed the server's own (receive based) one
+# by the host -> server delay. A larger gap points to a bad clock estimate on the
+# host, so the server's own measure is used instead.
+MAX_STAMP_DISAGREEMENT_S = 2.0
+
+
 class ConnectionManager:
     def __init__(self):
         # Use room_id(int) as a key for efficient management
@@ -66,7 +81,8 @@ class ConnectionManager:
         """
         Snapshot of the room's playback for late joiners: the stored sync payload
         with action set to play/pause and, while playing, the timestamp advanced
-        by the time elapsed since the host's last sync.
+        to now. server_ms (and position_at_ms when the host sent one) is set to
+        the moment the snapshot is made, so clients can add the delivery time.
         """
         state = self.room_states.get(room_id)
         if state is None:
@@ -81,9 +97,22 @@ class ConnectionManager:
         is_playing = playback["is_playing"]
         snapshot["action"] = "play" if is_playing else "pause"
 
+        now_ms = server_now_ms()
         timestamp = state.get("timestamp")
-        if is_playing and isinstance(timestamp, (int, float)) and not isinstance(timestamp, bool):
-            snapshot["timestamp"] = timestamp + (time.monotonic() - playback["updated_at"])
+        if is_playing and _is_number(timestamp):
+            elapsed = time.monotonic() - playback["updated_at"]
+            position_at_ms = state.get("position_at_ms")
+            if _is_number(position_at_ms):
+                # The host stamped when it read its position, so this also covers
+                # the host -> server delay
+                stamped = (now_ms - position_at_ms) / 1000
+                if 0 <= stamped - elapsed <= MAX_STAMP_DISAGREEMENT_S:
+                    elapsed = stamped
+            snapshot["timestamp"] = timestamp + elapsed
+
+        snapshot["server_ms"] = now_ms
+        if "position_at_ms" in snapshot:
+            snapshot["position_at_ms"] = now_ms
 
         return snapshot
 
