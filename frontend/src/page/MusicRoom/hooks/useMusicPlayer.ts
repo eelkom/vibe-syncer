@@ -48,6 +48,11 @@ const RECHECK_THRESHOLD_S = 0.2;
 
 type SeekKind = keyof typeof INITIAL_SEEK_LOSS_S;
 
+// Buffering right after the host's own seek is part of that seek, not a stall
+const HOST_SEEK_GRACE_MS = 2000;
+// A longer stall is more likely a sleeping tab; leave it to the host
+const MAX_HOST_CATCH_UP_S = 30;
+
 type GuestPlaybackMode = 'muted-autoplay' | 'unmuted' | 'fallback';
 
 interface PendingSync {
@@ -119,6 +124,9 @@ const useMusicPlayer = ({
     rechecks: number;
   } | null>(null);
   const hasSeekedThisSongRef = useRef(false);
+  // Where the host stalled mid-song, to jump past the stall when it ends
+  const hostStallRef = useRef<{ position: number; at: number } | null>(null);
+  const hostSeekAtRef = useRef(0);
   const resumeCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
   const serverClock = useServerClock({
     sendMessage,
@@ -171,6 +179,7 @@ const useMusicPlayer = ({
     lastSyncRef.current = null;
     seekCheckRef.current = null;
     hasSeekedThisSongRef.current = false;
+    hostStallRef.current = null;
   }, [currentSong?.music_url]);
 
   const getPlaybackTime = () => {
@@ -457,6 +466,7 @@ const useMusicPlayer = ({
 
   const handleSeek = (amount: number) => {
     setPlayed(amount);
+    hostSeekAtRef.current = performance.now();
     playerRef.current?.seekTo(amount, 'fraction');
     if (user?.isHost && currentSong) {
       sendMessage({
@@ -601,9 +611,37 @@ const useMusicPlayer = ({
   );
 
   const handlePlaybackStart = () => {
+    if (
+      user?.isHost &&
+      hostPlayingRef.current &&
+      performance.now() - hostSeekAtRef.current > HOST_SEEK_GRACE_MS
+    ) {
+      hostStallRef.current = {
+        position: getPlaybackTime(),
+        at: performance.now(),
+      };
+    }
     isActuallyPlayingRef.current = true;
     isBufferingRef.current = true;
     hostPlayingRef.current = false;
+  };
+
+  // Guests kept playing while the host stalled. Resuming in place would put the
+  // host behind them, and its next sync would pull every guest back; the host
+  // alone skips ahead instead.
+  const catchUpAfterHostStall = () => {
+    const stall = hostStallRef.current;
+    hostStallRef.current = null;
+    if (!user?.isHost || !stall || !isPlaying) return;
+
+    const stalled = (performance.now() - stall.at) / 1000;
+    if (stalled > MAX_HOST_CATCH_UP_S) return;
+    const target = stall.position + stalled;
+    if (target - getPlaybackTime() < SYNC_SEEK_THRESHOLD_S) return;
+
+    logger.log(`[Player] Host stalled ${stalled.toFixed(2)}s, skipping ahead`);
+    hostSeekAtRef.current = performance.now();
+    playerRef.current?.seekTo(target + seekLossRef.current.resync, 'seconds');
   };
 
   const handleBufferEnd = () => {
@@ -611,6 +649,7 @@ const useMusicPlayer = ({
     if (user?.isHost && isPlaying) {
       hostPlayingRef.current = true;
     }
+    catchUpAfterHostStall();
     scheduleResumeCheck();
   };
 
