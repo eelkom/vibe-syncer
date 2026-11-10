@@ -126,6 +126,13 @@ const useMusicPlayer = ({
   const hasSeekedThisSongRef = useRef(false);
   // Where the host stalled mid-song, to jump past the stall when it ends
   const hostStallRef = useRef<{ position: number; at: number } | null>(null);
+  // The host's skip past a stall, until its position is checked after resuming
+  const hostCatchUpRef = useRef<{
+    stall: { position: number; at: number };
+    compensation: number;
+    rechecks: number;
+  } | null>(null);
+  const hostCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hostSeekAtRef = useRef(0);
   const resumeCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
   const serverClock = useServerClock({
@@ -180,6 +187,7 @@ const useMusicPlayer = ({
     seekCheckRef.current = null;
     hasSeekedThisSongRef.current = false;
     hostStallRef.current = null;
+    hostCatchUpRef.current = null;
   }, [currentSong?.music_url]);
 
   const getPlaybackTime = () => {
@@ -241,7 +249,9 @@ const useMusicPlayer = ({
   };
 
   const sendPeriodicHostState = useEffectEvent(() => {
-    if (hostPlayingRef.current) sendHostState('play');
+    // Mid catch-up the position is still moving to where it should be
+    if (hostPlayingRef.current && !hostCatchUpRef.current)
+      sendHostState('play');
   });
 
   useEffect(() => {
@@ -628,7 +638,18 @@ const useMusicPlayer = ({
 
   // Guests kept playing while the host stalled. Resuming in place would put the
   // host behind them, and its next sync would pull every guest back; the host
-  // alone skips ahead instead.
+  // alone skips ahead instead, then checks where it landed like a guest does.
+  const hostSkipAhead = (
+    stall: { position: number; at: number },
+    rechecks: number,
+  ) => {
+    const target = stall.position + (performance.now() - stall.at) / 1000;
+    const compensation = seekLossRef.current.resync;
+    hostCatchUpRef.current = { stall, compensation, rechecks };
+    hostSeekAtRef.current = performance.now();
+    playerRef.current?.seekTo(target + compensation, 'seconds');
+  };
+
   const catchUpAfterHostStall = () => {
     const stall = hostStallRef.current;
     hostStallRef.current = null;
@@ -636,13 +657,59 @@ const useMusicPlayer = ({
 
     const stalled = (performance.now() - stall.at) / 1000;
     if (stalled > MAX_HOST_CATCH_UP_S) return;
-    const target = stall.position + stalled;
-    if (target - getPlaybackTime() < SYNC_SEEK_THRESHOLD_S) return;
+    if (stall.position + stalled - getPlaybackTime() < SYNC_SEEK_THRESHOLD_S) {
+      return;
+    }
 
     logger.log(`[Player] Host stalled ${stalled.toFixed(2)}s, skipping ahead`);
-    hostSeekAtRef.current = performance.now();
-    playerRef.current?.seekTo(target + seekLossRef.current.resync, 'seconds');
+    hostSkipAhead(stall, 0);
   };
+
+  // Plain function: it runs from a timer, and reads refs for anything that changes
+  const checkHostAfterCatchUp = () => {
+    hostCheckTimerRef.current = null;
+    const catchUp = hostCatchUpRef.current;
+    if (!catchUp || isBufferingRef.current) return;
+
+    const target =
+      catchUp.stall.position + (performance.now() - catchUp.stall.at) / 1000;
+    const behind = target - getPlaybackTime();
+    const losses = seekLossRef.current;
+    losses.resync = Math.min(
+      MAX_SEEK_LOSS_S,
+      Math.max(
+        0,
+        losses.resync * (1 - SEEK_LOSS_WEIGHT) +
+          (catchUp.compensation + behind) * SEEK_LOSS_WEIGHT,
+      ),
+    );
+    if (
+      Math.abs(behind) >= RECHECK_THRESHOLD_S &&
+      catchUp.rechecks < MAX_RECHECK_SEEKS
+    ) {
+      logger.log(`[Player] Host off by ${behind.toFixed(2)}s, again`);
+      hostSkipAhead(catchUp.stall, catchUp.rechecks + 1);
+      return;
+    }
+    hostCatchUpRef.current = null;
+    if (hostPlayingRef.current) sendHostState('play');
+  };
+
+  const scheduleHostCheck = () => {
+    if (!user?.isHost) return;
+    if (hostCheckTimerRef.current) clearTimeout(hostCheckTimerRef.current);
+    hostCheckTimerRef.current = setTimeout(
+      () => checkHostAfterCatchUp(),
+      RESUME_CHECK_DELAY_MS,
+    );
+  };
+
+  useEffect(
+    () => () => {
+      if (hostCheckTimerRef.current) clearTimeout(hostCheckTimerRef.current);
+    },
+    [],
+  );
 
   const handleBufferEnd = () => {
     isBufferingRef.current = false;
@@ -650,6 +717,7 @@ const useMusicPlayer = ({
       hostPlayingRef.current = true;
     }
     catchUpAfterHostStall();
+    scheduleHostCheck();
     scheduleResumeCheck();
   };
 
@@ -660,6 +728,13 @@ const useMusicPlayer = ({
     if (user?.isHost) {
       hostPlayingRef.current = true;
       hostHasPlayedRef.current = true;
+      // YouTube reports play before buffer end when a stall ends; the position
+      // now is still the stalled one, so skip ahead and report after the check
+      catchUpAfterHostStall();
+      if (hostCatchUpRef.current) {
+        scheduleHostCheck();
+        return;
+      }
       sendHostState('play');
     }
   };
