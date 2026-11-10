@@ -37,10 +37,15 @@ for combo in "$@"; do
   [[ -f "$OUT/index.html" ]] && { echo "Exists $OUT"; continue; }
   cp "$ORIG" "$HOOK"
   # Exactly one occurrence of each constant must be replaced.
-  [[ $(grep -c 'Math.abs(currentPlayerTime - timestamp) >= 2$' "$HOOK") == 1 ]] || { echo 'threshold pattern not unique' >&2; exit 1; }
+  # Before #59 the threshold was an inline 2; from #59 it is a named constant.
+  if [[ $(grep -c '^const SYNC_SEEK_THRESHOLD_S = [0-9.]*;$' "$HOOK") == 1 ]]; then
+    sed -i '' -e "s/^const SYNC_SEEK_THRESHOLD_S = [0-9.]*;\$/const SYNC_SEEK_THRESHOLD_S = ${T};/" "$HOOK"
+  else
+    [[ $(grep -c 'Math.abs(currentPlayerTime - timestamp) >= 2$' "$HOOK") == 1 ]] || { echo 'threshold pattern not unique' >&2; exit 1; }
+    sed -i '' -e "s/Math.abs(currentPlayerTime - timestamp) >= 2\$/Math.abs(currentPlayerTime - timestamp) >= ${T}/" "$HOOK"
+  fi
   [[ $(grep -c '^const HOST_SYNC_INTERVAL_MS = 5000;$' "$HOOK") == 1 ]] || { echo 'interval pattern not unique' >&2; exit 1; }
-  sed -i '' -e "s/Math.abs(currentPlayerTime - timestamp) >= 2\$/Math.abs(currentPlayerTime - timestamp) >= ${T}/" \
-    -e "s/^const HOST_SYNC_INTERVAL_MS = 5000;\$/const HOST_SYNC_INTERVAL_MS = ${I};/" "$HOOK"
+  sed -i '' -e "s/^const HOST_SYNC_INTERVAL_MS = 5000;\$/const HOST_SYNC_INTERVAL_MS = ${I};/" "$HOOK"
   (cd "$BASE/frontend" && VITE_API_BASE_URL=https://vibe-syncer.onrender.com VITE_WS_BASE_URL=wss://vibe-syncer.onrender.com/ws \
     npx --no-install vite build --outDir "$OUT" --emptyOutDir --logLevel error)
   grep -rq "wss://vibe-syncer.onrender.com/ws" "$OUT/assets" || { echo 'WS URL missing in build' >&2; exit 1; }

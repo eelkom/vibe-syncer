@@ -1,4 +1,4 @@
-// 실행: node loadtest/deploy/sync_grid_deployed.mjs --sha 669a045 --combos 2:5000,0.5:2000 [--runs 3] [--variant <name>]
+// 실행: node loadtest/deploy/sync_grid_deployed.mjs --sha 669a045 --combos 2:5000,0.5:2000 [--runs 3] [--variant <name>] [--tag <folder>]
 // 보정 기준(초)과 호스트 주기 전송 간격(ms)만 바꾼 측정용 프론트 빌드를 127.0.0.1:15173에서 띄우고
 // 실제 배포 서버(Render)에 접속한다. 빌드는 scripts/prepare_sync_grid.sh로 만든다.
 // 입장마다 Gemini 환영 메시지 호출이 발생한다. 방은 회차마다 삭제한다.
@@ -25,6 +25,18 @@ const DIST = sha => path.join(ROOT, `.baselines/sync-grid-${sha}-dist`);
 const PHASES = { join: [15000, 25000], a: [25000, 45000], b: [45000, 65000] };
 const DISTURB = [{ name: 'a', at: 25000, seconds: 0.8 }, { name: 'b', at: 45000, seconds: 4 }];
 const END = 65000;
+// Position jumps between consecutive samples (beyond normal playback)
+function jumps(samples, from, to) {
+  const out = { back: 0, forward: 0, list: [] };
+  const sel = samples.filter(s => s.t >= from && s.t < to && playing(s));
+  for (let i = 1; i < sel.length; i++) {
+    const d = (sel[i].ct - sel[i - 1].ct) - (sel[i].t - sel[i - 1].t) / 1000;
+    if (sel[i].t - sel[i - 1].t > 1000) continue;
+    if (d <= -0.3) { out.back++; out.list.push([sel[i].t, +d.toFixed(2)]); }
+    else if (d >= 0.3) { out.forward++; out.list.push([sel[i].t, +d.toFixed(2)]); }
+  }
+  return out;
+}
 
 function parseArgs(args) {
   const opts = { runs: 3, sha: null, combos: [], variant: null, tag: null };
@@ -134,6 +146,9 @@ async function runOnce(opts, combo, runNumber, target) {
       after_first_play_steady: seeks.filter(e => !ownSeek(e) && e.t >= t0 + 10000).length,
       times_ms: seeks.map(e => e.t - t0) };
     m.guest_buffering_samples = gs.filter(s => s.t >= t0 + 10000 && s.buffering).length;
+    // Audible jumps: the guest's during join (5-25s) and after each disturbance
+    m.jumps = { join: jumps(gs, t0 + 5000, t0 + 25000), a: jumps(gs, t0 + 25000, t0 + 45000), b: jumps(gs, t0 + 45000, end),
+      host_a: jumps(hs, t0 + 25000, t0 + 45000), host_b: jumps(hs, t0 + 45000, end) };
     m.guest_pause_samples = gs.filter(s => s.t >= t0 + 10000 && s.paused).length;
     const hostSyncs = hostTab.sent.filter(f => f.data.type === 'sync' && f.t >= t0 && f.t <= end);
     m.host_sync_messages = hostSyncs.length;

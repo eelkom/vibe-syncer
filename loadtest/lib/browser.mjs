@@ -140,7 +140,7 @@ export async function tab(browser, user, result, cleanup, playbackCondition = 'm
     setInterval(() => {
       const el = document.querySelector('audio,video');
       const sample = el ? { t: Date.now(), ct: el.currentTime, paused: el.paused,
-        muted: el.muted, volume: el.volume, act: navigator.userActivation.hasBeenActive }
+        muted: el.muted, volume: el.volume, readyState: el.readyState, act: navigator.userActivation.hasBeenActive }
         : { t: Date.now(), none: true, act: navigator.userActivation.hasBeenActive };
       if (syncProbe) {
         sample.src = el ? el.currentSrc || el.src : null;
